@@ -28,3 +28,6 @@ venv*
 *.log
 *.pt
 ssl
+
+node_modules
+node_modules/*
