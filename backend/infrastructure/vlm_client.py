@@ -7,7 +7,7 @@ from config.settings import MODEL_SERVER_URL
 def extract_text_from_image(image_bytes: bytes) -> str:
     
     files = {
-        "file": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")
+        "image": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")
     }
 
     try:

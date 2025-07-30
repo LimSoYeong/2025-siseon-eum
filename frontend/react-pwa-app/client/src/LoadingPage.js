@@ -22,7 +22,7 @@ export default function LoadingPage() {
       }
 
       const formData = new FormData();
-      formData.append('file', imageBlob, 'photo.jpg');
+      formData.append('image', imageBlob, 'photo.jpg');
 
       console.log('[Debug] FormData:', formData.get('file')); // ✅ 확인
 
@@ -34,7 +34,7 @@ export default function LoadingPage() {
         );
 
         // ✅ 결과 받아서 summary 페이지로 이동
-        const summaryText = response.data.summary;
+        const summaryText = response.data.result;
         navigate('/summary', { state: { summary: summaryText } });
       } catch (error) {
         console.error('서버 요청 실패:', error);

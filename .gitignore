@@ -27,3 +27,4 @@ venv/
 venv*
 *.log
 *.pt
+ssl

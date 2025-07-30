@@ -15,8 +15,8 @@ app.add_middleware(
 )
 
 @app.post("/inference")
-async def inference_endpoint(file: UploadFile = File(...)):
-    image_bytes = await file.read()
+async def inference_endpoint(image: UploadFile = File(...)):
+    image_bytes = await image.read()
     try:
         result = run_inference(image_bytes)
         return result
