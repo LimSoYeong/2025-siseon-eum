@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Splash from './Splash';
-import StartPage from './StartPage';
+import Splash from './pages/Splash';
+import StartPage from './pages/StartPage';
 
-import HomeScreen from './HomeScreen';
-import CameraScreen from './CameraScreen'; 
-import LoadingPage from './LoadingPage';
-import SummaryPage from './SummaryPage';
-import RecordPage from './RecordPage';
+import HomeScreen from './pages/HomeScreen';
+import CameraScreen from './pages/CameraScreen'; 
+import LoadingPage from './pages/LoadingPage';
+import SummaryPage from './pages/SummaryPage';
+import RecordPage from './pages/RecordPage';
 
 
 function App() {
