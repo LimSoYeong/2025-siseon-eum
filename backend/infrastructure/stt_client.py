@@ -5,6 +5,7 @@ from config.settings import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
 STT_URL = "https://naveropenapi.apigw.ntruss.com/recog/v1/stt"
 LANG = "Kor"  # 한국어
 
+
 def speech_to_text(audio_path: str) -> str:
     path = Path(audio_path)
     if not path.exists():

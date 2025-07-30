@@ -1,3 +1,5 @@
+# infrastructure/vlm_client.py
+
 import requests
 import io
 from config.settings import MODEL_SERVER_URL  

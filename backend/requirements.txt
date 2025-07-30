@@ -35,3 +35,12 @@ typing_extensions==4.14.1
 urllib3==2.5.0
 uvicorn==0.35.0
 zstandard==0.23.0
+
+fastapi
+uvicorn
+requests
+python-dotenv
+sqlalchemy
+langserve
+langchain
+langchain-core

@@ -1,4 +1,4 @@
-# FastAPI 엔트리포인트
+# model-server/app.py
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
