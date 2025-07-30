@@ -8,12 +8,10 @@ export default function LoadingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const imageBlob = location.state?.imageBlob;
-  const serverUrl = process.env.REACT_APP_MODEL_SERVER_URL;
+  const serverUrl = process.env.REACT_APP_API_SERVER_URL;
 
   useEffect(() => {
     const analyzeImage = async () => {
-      console.log('[Debug] imageBlob:', imageBlob); // ✅ blob 확인
-      console.log('✅ serverUrl:', serverUrl);
 
       if (!imageBlob) {
         alert('이미지를 불러올 수 없습니다.');
@@ -35,6 +33,7 @@ export default function LoadingPage() {
 
         // ✅ 결과 받아서 summary 페이지로 이동
         const summaryText = response.data.result;
+        sessionStorage.setItem('userInteracted', 'true');  // ✅ 사용자 인터랙션 기록
         navigate('/summary', { state: { summary: summaryText } });
       } catch (error) {
         console.error('서버 요청 실패:', error);

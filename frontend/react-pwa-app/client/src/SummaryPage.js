@@ -1,20 +1,47 @@
 // SummaryPage.js
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function SummaryPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const serverUrl = process.env.REACT_APP_API_SERVER_URL;
   const summaryText = location.state?.summary || '';
 
-  const handleVoice = () => {
-    if ('speechSynthesis' in window && summaryText) {
-      const utter = new window.SpeechSynthesisUtterance(summaryText.replace(/\n/g, ' '));
-      utter.lang = 'ko-KR';
-      window.speechSynthesis.speak(utter);
+  const handleVoice = async () => {
+    if (!summaryText) return;
+  
+    try {
+      const response = await axios.post(`${serverUrl}/tts`, { text: summaryText }, { responseType: 'blob' });
+      console.log('[✅ TTS 응답]', response);
+      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log('[✅ audioUrl]', audioUrl);
+  
+      // 오디오 재생
+      const audio = new Audio(audioUrl);
+      audio.play()
+      .then(() => {
+        console.log('[🎧 재생 성공]');
+      })
+      .catch(err => {
+        console.error('[❌ 재생 실패]', err);
+      });
+    } catch (error) {
+      console.error('TTS 요청 실패:', error);
+      alert('음성 재생에 실패했습니다.');
     }
   };
+
+  // 페이지 진입 시 자동 재생
+  useEffect(() => {
+    const isUserInteracted = window.sessionStorage.getItem("userInteracted");
+    if (summaryText && isUserInteracted === "true") {
+      handleVoice();
+    }
+  }, [summaryText]);
 
   const handleBack = () => {
     navigate('/camera'); // 다시 찍기로 카메라 화면 이동
