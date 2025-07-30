@@ -35,8 +35,3 @@ add_routes(app, summarize_runnable, path="/lang/summarize")
 add_routes(app, chat_runnable, path="/lang/chat")
 add_routes(app, tts_runnable, path="/lang/tts")
 add_routes(app, stt_runnable, path="/lang/stt")
-
-# 일반 REST + WebSocket 라우터 등록 
-app.include_router(summarize.router, prefix="/summarize")
-app.include_router(qa_router.router, prefix="/qa")
-app.include_router(chat_ws_router.router)

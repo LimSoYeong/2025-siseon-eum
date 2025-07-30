@@ -6,10 +6,10 @@ from infrastructure.vlm_client import extract_text_from_image
 router = APIRouter(prefix="/vlm", tags=["VLM"])
 
 @router.post("/describe")
-async def extract_text_from_image_api(image: UploadFile = File(...), prompt: str = Form("이 이미지를 설명해줘")):
+async def extract_text_from_image_api(image: UploadFile = File(...)):
     try:
         image_bytes = await image.read()
-        result = extract_text_from_image(image_bytes, prompt)
+        result = extract_text_from_image(image_bytes)
         return {"result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
