@@ -1,3 +1,5 @@
+# backend/model/inference.py
+
 from model import model, processor
 from PIL import Image
 import io

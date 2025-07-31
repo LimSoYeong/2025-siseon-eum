@@ -1,3 +1,5 @@
+# backend/model/model.py
+
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 import torch
 

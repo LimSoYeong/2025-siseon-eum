@@ -37,3 +37,7 @@ add_routes(app, summarize_runnable, path="/lang/summarize")
 add_routes(app, chat_runnable, path="/lang/chat")
 add_routes(app, tts_runnable, path="/lang/tts")
 add_routes(app, stt_runnable, path="/lang/stt")
+
+@app.get("/")
+def read_root():
+    return {"message": "FastAPI 서버가 잘 작동 중입니다!"}
