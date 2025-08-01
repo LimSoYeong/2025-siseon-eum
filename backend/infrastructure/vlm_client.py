@@ -1,9 +1,6 @@
 # infrastructure/vlm_client.py
 
-import requests
-import io
 from model.inference import run_inference
-from config.settings import MODEL_SERVER_URL  
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     try:

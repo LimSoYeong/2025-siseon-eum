@@ -1,12 +1,30 @@
 # backend/model/inference.py
 
-from model import model, processor
 from PIL import Image
 import io
 import torch
 import time
 
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+import torch
+
+# 모델과 프로세서 초기화
+model_name = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+    model_name,
+    torch_dtype=torch.float16,
+    device_map="auto"
+)
+model.eval()
+
+processor = AutoProcessor.from_pretrained(
+    model_name,
+    use_fast=False
+)
+
 def run_inference(image_bytes: bytes, prompt: str = "이 이미지를 노인을 위해 쉽게 설명해줘") -> dict:
+    start = time.time()
     # 이미지 로딩
     print("[INFO] 이미지 로딩 시작")
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -33,14 +51,14 @@ def run_inference(image_bytes: bytes, prompt: str = "이 이미지를 노인을 
 
     with torch.no_grad():
         print("[INFO] 모델 추론 시작")
-        start = time.time()
+        inference_start = time.time()
         generated_ids = model.generate(
             **inputs,
             max_new_tokens=256,
             do_sample=False
         )
-        end = time.time()
-        print(f"[INFO] 모델 추론 완료 - 소요 시간: {round(end - start, 2)}초")
+        inference_end = time.time()
+        print(f"[INFO] ⌛️ 모델 추론 시간: {round(inference_end - inference_start, 2)}초")
 
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
@@ -50,9 +68,10 @@ def run_inference(image_bytes: bytes, prompt: str = "이 이미지를 노인을 
         skip_special_tokens=True,
         clean_up_tokenization_spaces=False
     )[0]
-    print(f"[INFO] 생성된 텍스트: {output_text[:50]}...")
-
+    end = time.time()
+    print(f"[INFO] ✅ 생성된 텍스트: {output_text[:50]}...")
+    print(f"[INFO] ✅ 총 소요 시간: {round(end - start, 2)}초")
     return {
         "output": output_text,
-        "inference_time": round(end - start, 2)
+        "inference_time": round(inference_end - inference_start, 2)
     }
