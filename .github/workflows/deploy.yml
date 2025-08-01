@@ -25,13 +25,12 @@ jobs:
         run: npm run build
         working-directory: ./frontend
 
-      - name: Deploy to Server via SCP
-        uses: appleboy/scp-action@v0.1.4
+      - name: Manual SCP Deploy
+        uses: appleboy/ssh-action@master
         with:
           host: 211.188.62.223
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend/build/"
-          target: "/var/www/frontend"
-          overwrite: true
-          debug: true
+          script: |
+            rm -rf /var/www/frontend/*
+            scp -r ./frontend/build/* root@localhost:/var/www/frontend/
