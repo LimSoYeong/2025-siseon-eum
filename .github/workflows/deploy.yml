@@ -31,10 +31,22 @@ jobs:
           host: 211.188.62.223
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend/build/"
+          source: "frontend/build/**"
           target: "/var/www/frontend"
           overwrite: true
           strip_components: 0
+
+      - name: Debug remote directory structure
+        uses: appleboy/ssh-action@master
+        with:
+          host: 211.188.62.223
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "== Full dir =="
+            ls -al /var/www/frontend
+            echo "== Nested check =="
+            ls -al /var/www/frontend/build
 
       - name: Check files on remote server
         uses: appleboy/ssh-action@master
