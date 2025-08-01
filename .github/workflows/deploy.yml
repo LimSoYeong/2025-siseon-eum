@@ -31,5 +31,5 @@ jobs:
           host: 211.188.62.223
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./frontend/build/*"
+          source: "frontend/build/"
           target: "/var/www/frontend"
