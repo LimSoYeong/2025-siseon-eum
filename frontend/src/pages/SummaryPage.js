@@ -1,6 +1,6 @@
 // SummaryPage.js
 
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -10,7 +10,7 @@ export default function SummaryPage() {
   const serverUrl = process.env.REACT_APP_API_SERVER_URL;
   const summaryText = location.state?.summary || '';
 
-  const handleVoice = async () => {
+  const handleVoice = useCallback(async () => {
     if (!summaryText) return;
   
     try {
@@ -33,7 +33,7 @@ export default function SummaryPage() {
       console.error('TTS 요청 실패:', error);
       alert('음성 재생에 실패했습니다.');
     }
-  };
+  }, [summaryText]);
 
   // 페이지 진입 시 자동 재생
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function SummaryPage() {
     if (summaryText && isUserInteracted === "true") {
       handleVoice();
     }
-  }, [summaryText]);
+  }, [serverUrl, summaryText]);
 
   const handleBack = () => {
     navigate('/camera'); // 다시 찍기로 카메라 화면 이동

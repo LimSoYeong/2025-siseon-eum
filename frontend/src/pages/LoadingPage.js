@@ -43,7 +43,7 @@ export default function LoadingPage() {
     };
 
     analyzeImage();
-  }, [navigate, imageBlob]);
+  }, [serverUrl, navigate, imageBlob]);
 
   return (
     <div style={styles.container}>
