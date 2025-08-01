@@ -14,7 +14,7 @@ export default function SummaryPage() {
     if (!summaryText) return;
   
     try {
-      const response = await axios.post(`${serverUrl}/tts`, { text: summaryText }, { responseType: 'blob' });
+      const response = await axios.post(`${serverUrl}/api/tts`, { text: summaryText }, { responseType: 'blob' });
       console.log('[✅ TTS 응답]', response);
       const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);

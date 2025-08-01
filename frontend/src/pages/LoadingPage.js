@@ -26,7 +26,7 @@ export default function LoadingPage() {
 
       try {
         const response = await axios.post(
-          `${serverUrl}/vlm/describe`,
+          `${serverUrl}/api/describe`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );

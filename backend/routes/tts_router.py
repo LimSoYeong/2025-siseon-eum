@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from infrastructure.tts_client import text_to_speech
 from fastapi.responses import Response
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 class TTSRequest(BaseModel):
     text: str

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from infrastructure.stt_client import speech_to_text
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 @router.post("/stt")
 async def recognize_speech(file: UploadFile = File(...)):
