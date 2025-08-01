@@ -17,7 +17,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://siseon-eum.site"],  # 프론트에서 오는 요청을 허용
+    allow_origins=[
+        "https://siseon-eum.site",   # 배포용
+        "http://localhost:3000",     # 개발 중이면 이거 꼭 추가!!
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
