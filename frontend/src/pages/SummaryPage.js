@@ -33,7 +33,7 @@ export default function SummaryPage() {
       console.error('TTS 요청 실패:', error);
       alert('음성 재생에 실패했습니다.');
     }
-  }, [summaryText]);
+  }, [summaryText, serverUrl]);
 
   // 페이지 진입 시 자동 재생
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function SummaryPage() {
     if (summaryText && isUserInteracted === "true") {
       handleVoice();
     }
-  }, [serverUrl, summaryText]);
+  }, [serverUrl, summaryText, handleVoice]);
 
   const handleBack = () => {
     navigate('/camera'); // 다시 찍기로 카메라 화면 이동
