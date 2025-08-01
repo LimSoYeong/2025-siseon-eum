@@ -25,17 +25,22 @@ jobs:
         run: npm run build
         working-directory: ./frontend
 
-      - name: Check build output (디버깅용)
-        run: ls -al ./frontend/build
-        working-directory: .
-
       - name: Deploy to Server via SCP
         uses: appleboy/scp-action@v0.1.4
         with:
           host: 211.188.62.223
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend/build"
-          target: "/var/www"
-          strip_components: 1
+          source: "frontend/build/"
+          target: "/var/www/frontend"
           overwrite: true
+          strip_components: 0
+
+      - name: Check files on remote server
+        uses: appleboy/ssh-action@master
+        with:
+          host: 211.188.62.223
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            ls -al /var/www/frontend/index.html
