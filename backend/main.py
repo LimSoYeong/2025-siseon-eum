@@ -8,7 +8,7 @@ from langserve import add_routes
 # from runnables.chat_runnable import chat_runnable
 # from runnables.tts_runnable import tts_runnable
 # from runnables.stt_runnable import stt_runnable
-
+from routes import summarize, history_router
 from routes.stt_router import router as stt_router
 from routes.vlm_router import router as vlm_router
 from routes.tts_router import router as tts_router
@@ -33,6 +33,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(stt_router)
 app.include_router(vlm_router)
 app.include_router(tts_router)
+app.include_router(summarize)
+app.include_router(history_router)
 
 # # 🔹 LangServe 기반 runnable 등록
 # add_routes(app, summarize_runnable, path="/lang/summarize")
