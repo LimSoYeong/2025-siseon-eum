@@ -1,7 +1,10 @@
 // SummaryPage.js
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+
 
 export default function SummaryPage() {
   const location = useLocation();
@@ -17,39 +20,6 @@ export default function SummaryPage() {
   ]);
   const [isRecording, setIsRecording] = useState(false);
 
-  // ----------- 음성 재생/중지 함수 -----------
-  const playVoice = async () => {
-    stopVoice();
-    if (!summaryText) return;
-    try {
-      // 실제 서버 호출 부분(비동기)
-      // const response = await axios.post(
-      //   `${serverUrl}/tts`,
-      //   { text: summaryText },
-      //   { responseType: 'blob' }
-      // );
-      // const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
-      // const audioUrl = URL.createObjectURL(audioBlob);
-      // const audio = new Audio(audioUrl);
-
-      // 테스트 용도로만 (서버 없이 동작)
-      const audio = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
-      audioRef.current = audio;
-      setIsPlaying(true);
-      audio.play()
-        .then(() => console.log('[재생 성공]'))
-        .catch(err => {
-          setIsPlaying(false);
-          console.error('[재생 실패]', err);
-        });
-      audio.addEventListener('ended', () => setIsPlaying(false));
-      audio.addEventListener('pause', () => setIsPlaying(false));
-    } catch (error) {
-      setIsPlaying(false);
-      alert('음성 재생에 실패했습니다.');
-    }
-  };
-
   const stopVoice = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -57,6 +27,49 @@ export default function SummaryPage() {
       audioRef.current = null;
     }
     setIsPlaying(false);
+  };
+
+  // ----------- "다시 듣기" 기능-----------
+  const playVoice = useCallback(async () => {
+    stopVoice();
+    if (!summaryText) return;
+    try {
+      const response = await axios.post(`${serverUrl}/api/tts`, { text: summaryText }, { responseType: "blob" });
+      console.log('[✅ TTS 응답]', response);
+      const audioBlob = new Blob([response.data], { type: "audio/mpeg" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      const audio = new Audio(audioUrl); 
+      audioRef.current = audio;
+      setIsPlaying(true);
+      audio.play()
+        .then(() => console.log("[🎧 재생 성공]"))
+        .catch(err => {
+          setIsPlaying(false);
+          console.error("[❌ 재생 실패]", err);
+        });
+
+      audio.addEventListener("ended", () => setIsPlaying(false));
+      audio.addEventListener("pause", () => setIsPlaying(false));
+      
+    } catch (error) {
+      setIsPlaying(false);
+      alert('TTS 요청 실패:',error);
+      alert("음성 재생에 실패햇습니다.");
+    }
+  },[serverUrl, summaryText]);
+
+  // 최초 진입시 summary 자동 재생
+  useEffect(() => {
+    const isUserInteracted = window.sessionStorage.getItem("userInteracted");
+    if (summaryText && isUserInteracted === "true") {
+      playVoice();
+    }
+  }, [serverUrl, summaryText, playVoice]);
+  // ----------- 뒤로가기(카메라) 이동 -----------
+  const handleBack = () => {
+    stopVoice();
+    navigate('/camera'); // 다시 찍기로 카메라 화면 이동
   };
 
   // ----------- 마이크 (녹음 토글) -----------
@@ -81,11 +94,8 @@ export default function SummaryPage() {
     setInputValue('');
   };
 
-  // ----------- 뒤로가기(카메라) 이동 -----------
-  const handleBack = () => {
-    stopVoice();
-    navigate('/camera');
-  };
+  
+
 
   // ----------- 채팅 스크롤 하단 고정 -----------
   const chatEndRef = useRef();
