@@ -1,10 +1,17 @@
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+
 from pathlib import Path
 from datetime import datetime
 from PIL import Image
 import torch
 import json
 import time
+
+# 모델과 프로세서는 이곳에서 import
+from backend.langserve_app.model_loader import get_model, get_processor
 
 # ====== 디렉터리 설정 ======
 base_dir = Path(__file__).resolve().parent.parent
@@ -15,14 +22,8 @@ selected_indices = [80, 82, 30, 41, 50, 13, 44, 53, 18, 19]
 embedding_files = [embedding_dir / f"img_{i:03d}.pt" for i in selected_indices]
 
 # ====== 모델 및 프로세서 로드 ======
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-    "Qwen/Qwen2.5-VL-7B-Instruct", 
-    torch_dtype=torch.float16,
-    device_map="auto"
-)
-model.eval()
-
-processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", use_fast=False)
+model = get_model().eval() # 평가 모드 전환 : 추론시에 일관성 유지하기 위함
+processor = get_processor()
 
 # ====== Agent 역할 프롬프트 ======
 EXPLAINER_PROMPT = """
