@@ -1,9 +1,16 @@
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+
 from pathlib import Path
 from datetime import datetime
 import torch
 import json
 import time
+
+# 모델과 프로세서는 이곳에서 import
+from backend.langserve_app.model_loader import get_model, get_processor
 
 # ====== 경로 설정 ======
 base_dir = Path(__file__).resolve().parent.parent
@@ -74,15 +81,10 @@ FINANCE_PROMPT = """
     금융관련 안내문이야. 
     참고해서 노인분들 대상으로 요약해줘
     """
-   
-# ====== 모델 로드 ======
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-    "Qwen/Qwen2.5-VL-7B-Instruct",
-    torch_dtype=torch.float16,
-    device_map="auto"
-)
-model.eval()
-processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct")
+
+# ====== 모델 및 프로세서 로드 ======
+model = get_model().eval() # 평가 모드 전환 : 추론시에 일관성 유지하기 위함
+processor = get_processor()
 print(f"모델 디바이스: {model.device if hasattr(model, 'device') else '멀티 디바이스'}")
 
 # ====== 메인 루프 ======

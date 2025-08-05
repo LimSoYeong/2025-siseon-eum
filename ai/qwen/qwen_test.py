@@ -1,6 +1,10 @@
 # /root/2025-siseon-eum/ai/qwen/qwen_test.py
 
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+
 from qwen_vl_utils import process_vision_info
 from PIL import Image
 from datetime import datetime
@@ -8,6 +12,9 @@ import json
 from pathlib import Path
 import torch
 import time
+
+# ✅ 모델과 프로세서는 이곳에서 import
+from backend.langserve_app.model_loader import get_model, get_processor
 
 total_time = 0 # 시간 계산용
 base_dir = Path(__file__).resolve().parent.parent # 현재 파일 기준으로 경로 설정 : KSEB/ai
@@ -34,30 +41,11 @@ prompt_list = [
 ]
 
 # ====== 모델 로드 ======
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-    "Qwen/Qwen2.5-VL-7B-Instruct", 
-    torch_dtype=torch.float16, # rtx 4060 에서 메모리/속도에 효율적 => 수정하기
-    device_map="auto"
-)
-model.eval()  # 평가 모드 전환 : 추론시에 일관성 유지하기 위함
+model = get_model().eval() # 평가 모드 전환 : 추론시에 일관성 유지하기 위함
+processor = get_processor()
+
 print(f"모델 디바이스: {model.device if hasattr(model, 'device') else '멀티 디바이스'}")
 
-# 조건에 따라 processor 초기화
-if image_path and image_path.exists():
-    # 이미지 크기 조절이 필요한 경우
-    min_pixels = 256 * 14 * 14
-    max_pixels = 1280 * 14 * 14
-    processor = AutoProcessor.from_pretrained(
-        "Qwen/Qwen2.5-VL-7B-Instruct",
-        min_pixels=min_pixels,
-        max_pixels=max_pixels,
-        use_fast=False
-    )
-else:
-    # 임베딩 사용할 경우 크기 조절 필요 없음
-    processor = AutoProcessor.from_pretrained(
-        "Qwen/Qwen2.5-VL-7B-Instruct",
-        use_fast=False)
 
 # ====== JSONL 저장 함수 ======
 def save_result_jsonl(image_id, prompt, output, path=result_path):

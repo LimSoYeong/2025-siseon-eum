@@ -1,19 +1,23 @@
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor, TrainingArguments, Trainer
+import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+
+from transformers import AutoProcessor, TrainingArguments, Trainer
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import load_dataset
 from pathlib import Path
 import torch
+
+# ✅ 모델과 프로세서는 이곳에서 import
+from backend.langserve_app.model_loader import get_model, get_processor
 
 # 경로 설정
 base_dir = Path(__file__).resolve().parent.parent
 jsonl_path = base_dir / "data" / "train0722.jsonl"
 
 # 모델 로드
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-    "Qwen/Qwen2.5-VL-7B-Instruct",
-    device_map="auto",
-    torch_dtype=torch.float16,
-)
+model = get_model()
 
 # LoRA 설정
 lora_config = LoraConfig(
