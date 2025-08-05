@@ -1,7 +1,5 @@
 # routes/vlm_router.py
 
-# routes/vlm_router.py
-
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from infrastructure.vlm_client import extract_text_from_image
 
