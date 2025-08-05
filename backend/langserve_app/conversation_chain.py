@@ -1,7 +1,7 @@
 # backend/langserve_app/conversation_chain.py
 
 from langchain_core.runnables import Runnable
-from conversation_session import ConversationSession
+from .conversation_session import ConversationSession
 
 class ImageChatRunnable(Runnable):
     def __init__(self, image_path: str):
