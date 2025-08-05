@@ -1,7 +1,6 @@
 // SummaryPage.js
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function SummaryPage() {
@@ -10,12 +9,46 @@ export default function SummaryPage() {
   const serverUrl = process.env.REACT_APP_API_SERVER_URL;
   const summaryText = location.state?.summary || '';
   const audioRef = useRef(null);
-  const chatAreaRef = useRef(null);
 
-  const [history, setHistory] = useState([{ type: "summary", text:summaryText }]); // 챗 히스토리
-  const [isPlaying, setIsPlaying] = useState(false); // 듣기/중지 토글
-  const [recording, setRecording] = useState(false); // 음성 질문 중
-  const [loading, setLoading] = useState(false);     // 질문 처리중
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [chatList, setChatList] = useState([
+    { type: 'summary', text: summaryText }
+  ]);
+  const [isRecording, setIsRecording] = useState(false);
+
+  // ----------- 음성 재생/중지 함수 -----------
+  const playVoice = async () => {
+    stopVoice();
+    if (!summaryText) return;
+    try {
+      // 실제 서버 호출 부분(비동기)
+      // const response = await axios.post(
+      //   `${serverUrl}/tts`,
+      //   { text: summaryText },
+      //   { responseType: 'blob' }
+      // );
+      // const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+      // const audioUrl = URL.createObjectURL(audioBlob);
+      // const audio = new Audio(audioUrl);
+
+      // 테스트 용도로만 (서버 없이 동작)
+      const audio = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+      audioRef.current = audio;
+      setIsPlaying(true);
+      audio.play()
+        .then(() => console.log('[재생 성공]'))
+        .catch(err => {
+          setIsPlaying(false);
+          console.error('[재생 실패]', err);
+        });
+      audio.addEventListener('ended', () => setIsPlaying(false));
+      audio.addEventListener('pause', () => setIsPlaying(false));
+    } catch (error) {
+      setIsPlaying(false);
+      alert('음성 재생에 실패했습니다.');
+    }
+  };
 
   const stopVoice = () => {
     if (audioRef.current) {
@@ -26,156 +59,41 @@ export default function SummaryPage() {
     setIsPlaying(false);
   };
 
-  // --- "다시 듣기" 기능 ---
-  const playVoice = useCallback(async () => {
-    stopVoice();
-    if (!summaryText) return;
-    
-    try {
-      const response = await axios.post(`${serverUrl}/api/tts`, { text: summaryText }, { responseType: "blob" });
-      console.log('[✅ TTS 응답]', response);
-      const audioBlob = new Blob([response.data], { type: "audio/mpeg" });
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      const audio = new Audio(audioUrl); 
-      audioRef.current = audio;
-      setIsPlaying(true);
-      audio.play()
-        .then(() => console.log("[🎧 재생 성공]"))
-        .catch(err => {
-          setIsPlaying(false);
-          console.error("[❌ 재생 실패]", err);
-        });
-
-      audio.addEventListener("ended", () => setIsPlaying(false));
-      audio.addEventListener("pause", () => setIsPlaying(false));
-    } catch (error) {
-      setIsPlaying(false);
-      console.error('TTS 요청 실패:', error);
-      alert("음성 재생에 실패했습니다.");
-    }
-  }, [serverUrl, summaryText]);
-
-
-
-  // --- 음성 질문 (녹음+업로드) ---
-  const mediaRecorderRef = useRef();
-  const audioChunksRef = useRef([]);
-  const startRecording = async () => {
-    setRecording(true);
-    setLoading(false);
-    if (!navigator.mediaDevices) {
-      alert("음성녹음을 지원하지 않는 브라우저입니다.");
-      setRecording(false);
-      return;
-    }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new window.MediaRecorder(stream);
-    audioChunksRef.current = [];
-    mediaRecorder.ondataavailable = (e) => {
-      audioChunksRef.current.push(e.data);
-    };
-    mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" }); // mp3만 지원시 수정 필요
-      sendVoiceToServer(audioBlob);
-    };
-    mediaRecorderRef.current = mediaRecorder;
-    mediaRecorder.start();
-  };
-  const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
+  // ----------- 마이크 (녹음 토글) -----------
+  const handleMicClick = () => {
+    if (!isRecording) {
+      setIsRecording(true);
+      alert("녹음 시작 (실제 구현 필요)");
+    } else {
+      setIsRecording(false);
+      alert("녹음 종료 (실제 구현 필요)");
     }
   };
 
-  // 음성 파일 서버로 전송(QA)
-  const sendVoiceToServer = async (audioBlob) => {
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", audioBlob, "question.mp3"); // mp3 지원이면 .mp3로 바꿔서 전송
-      const response = await axios.post(
-        `${serverUrl}/api/stt`, formData, { headers: { "Content-Type": "multipart/form-data" } }
-      );
-      setHistory((prev) => [
-        ...prev,
-        { type: "question", text: response.data.user_text },
-        { type: "answer", text: response.data.bot_text, audio: response.data.bot_audio_url }
-      ]);
-    } catch (e) {
-      setHistory((prev) => [
-        ...prev,
-        { type: "error", text: "서버와의 통신에 실패했습니다." }
-      ]);
-    }
-    setLoading(false);
+  // ----------- 전송 버튼 -----------
+  const isSendActive = inputValue.trim().length > 0;
+  const handleSend = () => {
+    if (!isSendActive) return;
+    setChatList(prev => [
+      ...prev,
+      { type: 'question', text: inputValue }
+    ]);
+    setInputValue('');
   };
 
-  // 챗 히스토리 맨 아래로 자동 스크롤
-  useEffect(() => {
-    if (chatAreaRef.current) {
-      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
-    }
-  }, [history, loading]);
-
-  // 최초 진입시 summary 자동 재생
-  useEffect(() => {
-    const isUserInteracted = window.sessionStorage.getItem("userInteracted");
-    if (summaryText && isUserInteracted === "true") {
-      playVoice();
-    }
-  }, [serverUrl, summaryText, playVoice]);
-
+  // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
     stopVoice();
-    navigate('/camera'); // 다시 찍기로 카메라 화면 이동
+    navigate('/camera');
   };
 
-  // 하단 버튼 UI 분기
-  const renderBottomBar = () => {
-    if (recording) {
-      return (
-        <button
-          style={{
-            ...styles.voiceButton,
-            background: "#27ae60" // 초록
-          }}
-          onClick={stopRecording}
-        >
-          <span role="img" aria-label="stop" style={styles.micIcon}>⏹️</span>
-          질문 끝내기
-        </button>
-      );
-    } else {
-      return (
-        <>
-          <button
-            style={{
-              ...styles.voiceButton,
-              background: isPlaying ? "#bbb" : "#2980b9"
-            }}
-            onClick={isPlaying ? stopVoice : playVoice}
-            disabled={isPlaying}
-          >
-            <span role="img" aria-label="sound" style={styles.micIcon}>🔊</span>
-            다시 듣기
-          </button>
-          <button
-            style={{
-              ...styles.voiceButton,
-              background: "#e74c3c",
-              marginLeft: 8
-            }}
-            onClick={startRecording}
-          >
-            <span role="img" aria-label="mic" style={styles.micIcon}>🎤</span>
-            음성 질문
-          </button>
-        </>
-      );
+  // ----------- 채팅 스크롤 하단 고정 -----------
+  const chatEndRef = useRef();
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, [chatList]);
 
   return (
     <div style={styles.page}>
@@ -185,33 +103,87 @@ export default function SummaryPage() {
           <button style={styles.backBtn} onClick={handleBack}>&larr;</button>
           <span style={styles.topTitle}>다시 찍기</span>
         </div>
-        {/* 챗 히스토리 */}
-        <div style={styles.chatArea} ref={chatAreaRef}>
-          {history.map((item, idx) => (
-            <div key={idx} style={{
-              ...styles.bubble,
-              ...(item.type === "question" ? styles.userBubble : item.type === "answer" ? styles.botBubble : {})
-            }}>
-              {item.type === "summary" && <>{item.text}</>}
-              {item.type === "question" && <>🙋‍♂️ {item.text}</>}
-              {item.type === "answer" &&
-                <>
-                  🤖 {item.text}
-                  {item.audio &&
-                    <audio src={item.audio} controls style={{ marginLeft: 8, height: 28 }} />
-                  }
-                </>
-              }
-              {item.type === "error" && <span style={{ color: "red" }}>{item.text}</span>}
-            </div>
-          ))}
-          {loading && (
-            <div style={{ ...styles.bubble, ...styles.botBubble }}>답변 생성 중...</div>
+        {/* 채팅 영역 */}
+        <div style={styles.chatArea}>
+          {chatList.map((msg, idx) =>
+            msg.type === 'summary' ? (
+              <div key={idx} style={styles.summaryBox}>
+                <div style={styles.summaryText}>{msg.text}</div>
+                <div style={styles.voiceBtnBox}>
+                  {!isPlaying ? (
+                    <button
+                      style={styles.playBtn}
+                      onClick={playVoice}
+                    >
+                      <span style={{ marginRight: 4, fontSize: 17 }}>▶</span> 다시듣기
+                    </button>
+                  ) : (
+                    <button
+                      style={styles.stopBtn}
+                      onClick={stopVoice}
+                    >
+                      <span style={{ marginRight: 4, fontSize: 17 }}>■</span> 음성중지
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                key={idx}
+                style={{
+                  ...styles.chatBubble,
+                  ...(msg.type === 'question'
+                    ? styles.questionBubble
+                    : styles.answerBubble)
+                }}
+              >
+                {msg.text}
+              </div>
+            )
           )}
+          <div ref={chatEndRef} />
         </div>
-        {/* 하단 버튼 */}
+        {/* 하단 입력바 */}
         <div style={styles.bottomBar}>
-          {renderBottomBar()}
+          {/* 마이크 버튼 */}
+          <button
+            style={{
+              ...styles.micButton,
+              background: isRecording ? '#ba2727' : '#f33d2d',
+              boxShadow: isRecording ? '0 0 0 2px #d36e6e' : styles.micButton.boxShadow
+            }}
+            onClick={handleMicClick}
+            title="음성 녹음"
+          >
+            <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
+              <circle cx="45" cy="45" r="40" fill="#F44336"/>
+              <rect x="34" y="28" width="22" height="30" rx="11" fill="#fff"/>
+              <rect x="42" y="60" width="6" height="8" rx="2" fill="#fff"/>
+              <rect x="32" y="44" width="26" height="7" rx="3.5" fill="#fff"/>
+              
+            </svg>
+           
+          </button>
+          {/* 입력창 */}
+          <input
+            style={styles.input}
+            placeholder="질문을 입력하세요"
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={e => isSendActive && e.key === 'Enter' && handleSend()}
+          />
+          {/* 전송 버튼 */}
+          <button
+            style={{
+              ...styles.sendButton,
+              background: isSendActive ? '#111' : '#f1f1f1',
+              color: isSendActive ? '#fff' : '#c0c0c0',
+              cursor: isSendActive ? 'pointer' : 'not-allowed',
+              border: isSendActive ? 'none' : '1.2px solid #ececec'
+            }}
+            onClick={isSendActive ? handleSend : undefined}
+            disabled={!isSendActive}
+          >전송</button>
         </div>
       </div>
     </div>
@@ -228,19 +200,18 @@ const styles = {
     justifyContent: 'center',
   },
   container: {
-    width: 320,
-    minHeight: '80vh',
-    margin: '40px auto',
-    border: '4px solid #eee',
+    width: 360,
+    height: 600,
+    maxWidth: '100vw',
+    margin: '0 auto',
+    border: 'none',
     borderRadius: 18,
     background: '#fff',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     boxSizing: 'border-box',
-    padding: 0,
     position: 'relative',
+    overflow: 'hidden'
   },
   topBar: {
     height: 44,
@@ -250,8 +221,9 @@ const styles = {
     alignItems: 'center',
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
-    marginBottom: 8,
-    justifyContent: 'flex-start'
+    marginBottom: 0,
+    justifyContent: 'flex-start',
+    flexShrink: 0,
   },
   backBtn: {
     background: 'none',
@@ -272,64 +244,133 @@ const styles = {
   chatArea: {
     flex: 1,
     width: '100%',
-    minHeight: 240,
-    maxHeight: 380,
+    padding: '18px 10px 18px 10px',
+    background: '#fff',
     overflowY: 'auto',
-    padding: '8px 10px',
-    background: "#fff",
-    display: "flex",
-    flexDirection: "column",
-    gap: 7
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
   },
-  bubble: {
-    borderRadius: 10,
-    padding: '9px 13px',
+  // summary(요약) 말풍선 - 넓게, 버튼과 하나의 박스!
+  summaryBox: {
+    alignSelf: 'flex-start',
+    width: '90%',
+    background: '#fcfafb',
+    borderRadius: 18,
+    padding: '16px 16px 11px 16px',
     marginBottom: 2,
-    maxWidth: '85%',
-    wordBreak: "keep-all",
-    background: "#f3f6fa",
-    color: "#1e293b",
-    fontSize: 15.5
+    boxShadow: '0 1px 6px 0 rgba(50,50,50,0.04)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
   },
-  userBubble: {
-    alignSelf: "flex-end",
-    background: "#e3edfb",
-    color: "#003b8c"
+  summaryText: {
+    color: '#222',
+    fontSize: 15.5,
+    lineHeight: 1.6,
+    wordBreak: 'break-word',
+    marginBottom: 4,
+    whiteSpace: 'pre-line'
   },
-  botBubble: {
-    alignSelf: "flex-start",
-    background: "#e6f7e6",
-    color: "#195e19"
+  voiceBtnBox: {
+    display: 'flex',
+    marginTop: 2,
+  },
+  playBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    background: '#25c03b',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    padding: '8px 20px',
+    fontWeight: 600,
+    fontSize: 17,
+    cursor: 'pointer',
+    boxShadow: '0 1px 6px 0 rgba(30,30,30,0.08)'
+  },
+  stopBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    background: '#f78427',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    padding: '8px 20px',
+    fontWeight: 600,
+    fontSize: 17,
+    cursor: 'pointer',
+    boxShadow: '0 1px 6px 0 rgba(30,30,30,0.10)'
+  },
+  // 질문 말풍선 - 오른쪽, 파랑
+  chatBubble: {
+    maxWidth: '75%',
+    padding: '13px 16px',
+    borderRadius: 14,
+    fontSize: 15.5,
+    lineHeight: 1.55,
+    wordBreak: 'break-all',
+    marginBottom: 2,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  questionBubble: {
+    alignSelf: 'flex-end',
+    background: '#e7f1ff',
+    color: '#1d3d68',
+  },
+  answerBubble: {
+    alignSelf: 'flex-start',
+    background: '#e9ffe7',
+    color: '#244e23',
   },
   bottomBar: {
     width: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: "center",
-    padding: '14px 0 16px 0',
-    background: '#fff',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    borderTop: '1.5px solid #f3f3f3'
-  },
-  voiceButton: {
+    minHeight: 56,
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    width: 240,
-    height: 46,
-    color: '#fff',
-    fontWeight: 600,
-    fontSize: 17,
-    borderRadius: 24,
-    border: 'none',
-    boxShadow: '0 2px 10px 0 rgba(30,30,30,0.08)',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'background 0.15s'
+    padding: '12px 12px 14px 12px',
+    background: '#fff',
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    boxSizing: 'border-box',
+    flexShrink: 0,
+    position: 'relative'
   },
-  micIcon: {
-    fontSize: 21,
-    marginRight: 4,
+  micButton: {
+    width: 44,
+    height: 44,
+    borderRadius: '50%',
+    background: '#f33d2d',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+    boxShadow: '0 2px 8px 0 rgba(30,30,30,0.08)',
+    cursor: 'pointer',
+    transition: 'background 0.1s'
+  },
+  input: {
+    flex: 1,
+    height: 38,
+    border: '1.5px solid #e0e0e0',
+    borderRadius: 16,
+    padding: '0 12px',
+    fontSize: 15,
+    outline: 'none',
+    marginRight: 6,
+    background: '#fff'
+  },
+  sendButton: {
+    height: 38,
+    minWidth: 48,
+    fontWeight: 600,
+    border: 'none',
+    borderRadius: 13,
+    fontSize: 15,
+    cursor: 'pointer',
+    transition: 'background 0.2s, color 0.2s'
   }
 };
