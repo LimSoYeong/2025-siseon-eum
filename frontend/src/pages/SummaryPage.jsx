@@ -106,7 +106,13 @@ export default function SummaryPage() {
               withCredentials: true,
             });
             console.log("[✅ STT 결과]", res.data);
-            alert(`STT 결과: ${res.data}`);
+
+            // 👇 바로 질문 보내기
+            const sttResult = res.data;
+            if (sttResult && sttResult.trim().length > 0) {
+              handleSend(sttResult);
+            }
+
           } catch (err) {
             console.error("[❌ STT 실패]", err);
             alert("STT 요청 실패");
@@ -117,7 +123,6 @@ export default function SummaryPage() {
         setMediaRecorder(recorder);
         setIsRecording(true);
         setAudioChunks(chunks);
-        alert("🎙️ 녹음 시작!");
   
       } catch (err) {
         console.error("🎤 마이크 접근 실패", err);
@@ -127,19 +132,43 @@ export default function SummaryPage() {
     } else {
       mediaRecorder?.stop();
       setIsRecording(false);
-      alert("⏹️ 녹음 종료!");
     }
   };
 
   // ----------- 전송 버튼 -----------
   const isSendActive = inputValue.trim().length > 0;
-  const handleSend = () => {
-    if (!isSendActive) return;
+  const handleSend = async (text) => {
+    const finalText = text || inputValue;
+    if (!finalText.trim()) return;
+  
+    // 질문 추가
     setChatList(prev => [
       ...prev,
-      { type: 'question', text: inputValue }
+      { type: 'question', text: finalText }
     ]);
     setInputValue('');
+  
+    try {
+      const res = await axios.post(`${serverUrl}/api/ask`, {
+        question: finalText
+      }, {
+        withCredentials: true
+      });
+  
+      const answer = res.data?.answer || res.data.error  || '답변을 가져오지 못했습니다.';
+  
+      // 답변 추가
+      setChatList(prev => [
+        ...prev,
+        { type: 'answer', text: answer }
+      ]);
+    } catch (err) {
+      console.error("[❌ 질문 응답 실패]", err);
+      setChatList(prev => [
+        ...prev,
+        { type: 'answer', text: '서버 오류로 답변을 가져오지 못했습니다.' }
+      ]);
+    }
   };
 
   // ----------- 채팅 스크롤 하단 고정 -----------
@@ -161,7 +190,7 @@ export default function SummaryPage() {
         {/* 채팅 영역 */}
         <div style={styles.chatArea}>
           {chatList.map((msg, idx) =>
-            msg.type === 'summary' ? (
+            msg.type === 'summary' || msg.type === 'answer' ? (
               <div key={idx} style={styles.summaryBox}>
                 <div style={styles.summaryText}>{msg.text}</div>
                 <div style={styles.voiceBtnBox}>
