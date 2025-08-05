@@ -22,17 +22,20 @@ export default function LoadingPage() {
       const formData = new FormData();
       formData.append('image', imageBlob, 'photo.jpg');
 
-      console.log('[Debug] FormData:', formData.get('file')); // ✅ 확인
+      console.log('[Debug] FormData:', formData.get('image'));
 
       try {
         const response = await axios.post(
-          `${serverUrl}/api/describe`,
+          `${serverUrl}/api/start_session`,
           formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
+          { 
+            headers: { 'Content-Type': 'multipart/form-data' },
+            withCredentials: true // 쿠키 저장 허용
+          }
         );
 
         // ✅ 결과 받아서 summary 페이지로 이동
-        const summaryText = response.data.result;
+        const summaryText = response.data.answer;
         sessionStorage.setItem('userInteracted', 'true');  // ✅ 사용자 인터랙션 기록
         navigate('/summary', { state: { summary: summaryText } });
       } catch (error) {
