@@ -4,8 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-
-
 export default function SummaryPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -18,7 +16,11 @@ export default function SummaryPage() {
   const [chatList, setChatList] = useState([
     { type: 'summary', text: summaryText }
   ]);
+
+  // STT
   const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
 
   const stopVoice = () => {
     if (audioRef.current) {
@@ -73,13 +75,59 @@ export default function SummaryPage() {
   };
 
   // ----------- 마이크 (녹음 토글) -----------
-  const handleMicClick = () => {
+  const handleMicClick = async () => {
     if (!isRecording) {
-      setIsRecording(true);
-      alert("녹음 시작 (실제 구현 필요)");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+  
+        const chunks = [];
+  
+        recorder.ondataavailable = (e) => {
+          chunks.push(e.data);
+        };
+  
+        recorder.onstop = async () => {
+          console.log("[🧪 chunks의 타입 체크]", chunks, Array.isArray(chunks));
+          if (!Array.isArray(chunks)) {
+            alert("⚠️ 오류: chunks가 배열이 아닙니다!");
+            return;
+          }
+          const audioBlob = new Blob(chunks, { type: 'audio/mp3' });
+          setAudioChunks([]);  // 초기화
+  
+          // 업로드용 form 데이터
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.mp3");
+  
+          try {
+            const res = await axios.post(`${process.env.REACT_APP_API_SERVER_URL}/api/stt`, formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+              withCredentials: true,
+            });
+            console.log("[✅ STT 결과]", res.data);
+            alert(`STT 결과: ${res.data}`);
+          } catch (err) {
+            console.error("[❌ STT 실패]", err);
+            alert("STT 요청 실패");
+          }
+        };
+  
+        recorder.start();
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+        setAudioChunks(chunks);
+        alert("🎙️ 녹음 시작!");
+  
+      } catch (err) {
+        console.error("🎤 마이크 접근 실패", err);
+        alert("마이크 권한이 필요합니다.");
+      }
+  
     } else {
+      mediaRecorder?.stop();
       setIsRecording(false);
-      alert("녹음 종료 (실제 구현 필요)");
+      alert("⏹️ 녹음 종료!");
     }
   };
 
@@ -93,9 +141,6 @@ export default function SummaryPage() {
     ]);
     setInputValue('');
   };
-
-  
-
 
   // ----------- 채팅 스크롤 하단 고정 -----------
   const chatEndRef = useRef();
