@@ -29,6 +29,64 @@ export default function SummaryPage() {
     setIsPlaying(false);
   };
 
+  //-----------음성 질문 (녹음 + 업로드)-------------//
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const startRecording = async () => { 
+    setIsRecording(true);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("음성녹음을 지원하지 않는 브라우저입니다.");
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new window.MediaRecorder(stream);
+
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        sendVoiceToServer(audioBlob);
+      };
+
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+    } catch (error) {
+      alert("마이크 권한이 없거나 접근에 실패했습니다.");
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => { 
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const sendVoiceToServer = async (audioBlob) => { 
+    try {
+      const formData = new FormData();
+      formData.append("file", audioBlob, "question.webm");
+      const response = await axios.post(`${serverUrl}/api/stt`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setChatList(prev => [
+        ...prev,
+        { type: 'question', text: response.data.user_text },
+        { type: 'answer', text: response.data.bot_text }
+      ]);
+    } catch (e) {
+      setChatList(prev => [...prev, { type: "error", text: "서버와의 통신에 실패했습니다." }]);
+    }
+  };
+
+
+
   // ----------- "다시 듣기" 기능-----------
   const playVoice = useCallback(async () => {
     stopVoice();
@@ -199,6 +257,32 @@ export default function SummaryPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const styles = {
   page: {
