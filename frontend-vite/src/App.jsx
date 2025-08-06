@@ -6,19 +6,31 @@ import LoadingPage from './pages/LoadingPage';
 import SummaryPage from './pages/SummaryPage';
 import AnswerPage from './pages/AnswerPage';
 
-
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Splash />} />
-        <Route path="/home" element={<HomeScreen />} />
-        <Route path="/camera" element={<CameraScreen />} />
-        <Route path="/load" element={<LoadingPage />} />
-        <Route path="/summary" element={<SummaryPage />} />
-        <Route path="/answer" element={<AnswerPage />} />
-      </Routes>
-    </BrowserRouter>
+    // 여기서 flex 중앙정렬 div로 전체 감싸기!
+    <div
+      style={{
+        minHeight: "100vh",
+        width: "100vw",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#fff"
+      }}
+    >
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Splash />} />
+          <Route path="/home" element={<HomeScreen />} />
+          <Route path="/camera" element={<CameraScreen />} />
+          <Route path="/load" element={<LoadingPage />} />
+          <Route path="/summary" element={<SummaryPage />} />
+          <Route path="/answer" element={<AnswerPage />} />
+        </Routes>
+      </BrowserRouter>
+    </div>
   );
 }
 export default App;
+
