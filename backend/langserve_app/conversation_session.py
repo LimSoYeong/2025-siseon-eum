@@ -30,15 +30,10 @@ class ConversationSession:
         self.image_features = self._extract_cached_vision_inputs(self.image)
         self.last_response = None
 
-        # LangChain memory에 이미지 설명을 위한 초기 프롬프트를 자동 호출
-        if initial_prompt:
-            self.ask(initial_prompt)
-
     def _extract_cached_vision_inputs(self, image):
         """이미지 전처리 후 pixel_values와 attention_mask만 캐시"""
         messages = [{"role": "user", "content": [{"type": "image", "image": self.image}]}]
         start_embedd = time.time()
-        # 반환값 하나만 받도록 수정
         with torch.no_grad():
             image_inputs, _ = process_vision_info(messages)
         end_embedd = time.time()
