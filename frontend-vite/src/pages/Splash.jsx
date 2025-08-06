@@ -7,7 +7,7 @@ export default function Splash() {
   useEffect(() => {
     // 1.5초 후 /start(시작화면)으로 이동
     const timeout = setTimeout(() => {
-      navigate('/start');
+      navigate('/home');
     }, 1500);
     return () => clearTimeout(timeout);
   }, [navigate]);

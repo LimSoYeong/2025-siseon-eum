@@ -66,7 +66,7 @@ export default function HomeScreen() {
       </div>
       <button style={styles.cameraBtn} onClick={handleStartCamera}>
         <span style={styles.cameraIcon} role="img" aria-label="camera">📷</span>
-        문서 촬영하기
+        문서 촬영
       </button>
     </div>
   );
