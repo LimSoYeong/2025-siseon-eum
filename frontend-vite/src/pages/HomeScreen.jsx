@@ -1,40 +1,3 @@
-// import React from 'react';
-// import { useNavigate } from 'react-router-dom';
-
-// export default function HomeScreen() {
-//   const navigate = useNavigate();
-
-//   const handleStartCamera = () => {
-//     navigate('/camera');
-//   };
-
-//   return (
-//     <div style={styles.container}>
-//       <h1 style={styles.title}>📱 시선이음 보는 것에서, 이해로. 시선을 잇다.</h1>
-//       <button style={styles.button} onClick={handleStartCamera}>
-//         Start Camera
-//       </button>
-//     </div>
-//   );
-// }
-
-// const styles = {
-//   container: {
-//     minHeight: '100vh', display: 'flex', flexDirection: 'column',
-//     justifyContent: 'center', alignItems: 'center', padding: 20
-//   },
-//   title: {
-//     fontSize: 24, marginBottom: 20
-//   },
-//   button: {
-//     fontSize: 18, padding: '12px 32px', borderRadius: 10, border: 'none',
-//     background: '#222', color: '#fff', cursor: 'pointer'
-//   }
-// };
-
-// -----------------------------------
-// 디자인 수정본 HomeScreen.js 파일 코드 
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -77,7 +40,7 @@ const styles = {
     width: 320,
     minHeight: '80vh',
     margin: '40px auto',
-    border: '4px solid #eee',
+    // border: '4px solid #eee',  // 회색 테두리
     borderRadius: 18,
     background: '#fff',
     display: 'flex',
