@@ -22,10 +22,11 @@ export default function Splash() {
 
 const styles = {
   container: {
-    width: 320,
+    width: '100%',
+    maxWidth: 400,
     minHeight: '80vh',
     margin: '40px auto',
-    border: '4px solid #eee',
+    // border: '4px solid #eee',  // 회색 테두리
     borderRadius: 18,
     background: '#fff',
     display: 'flex',
