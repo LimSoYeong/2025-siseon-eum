@@ -17,7 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://siseon-eum.site",   # 배포용
-        "http://localhost:3000",     # 개발 중이면 이거 꼭 추가!!
+        "http://localhost:5173",     # 개발 중
     ],
     allow_credentials=True,
     allow_methods=["*"],
