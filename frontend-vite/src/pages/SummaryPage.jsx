@@ -1,5 +1,3 @@
-// SummaryPage.js
-
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -7,7 +5,7 @@ import axios from 'axios';
 export default function SummaryPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const serverUrl = process.env.REACT_APP_API_SERVER_URL;
+  const apiUrl = import.meta.env.VITE_API_URL;
   const summaryText = location.state?.summary || '';
   const audioRef = useRef(null);
 
@@ -22,6 +20,21 @@ export default function SummaryPage() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
 
+  // 애니메이션용 state (파동)
+  const [pulse, setPulse] = useState(false);
+
+  // 녹음 애니메이션(파동) 타이머 관리
+  useEffect(() => {
+    let interval;
+    if (isRecording) {
+      setPulse(true);
+      interval = setInterval(() => setPulse(p => !p), 550);
+    } else {
+      setPulse(false);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
   const stopVoice = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -31,35 +44,29 @@ export default function SummaryPage() {
     setIsPlaying(false);
   };
 
-  // ----------- "다시 듣기" 기능-----------
+  // ----------- "다시 듣기" 기능 -----------
   const playVoice = useCallback(async () => {
     stopVoice();
     if (!summaryText) return;
     try {
-      const response = await axios.post(`${serverUrl}/api/tts`, { text: summaryText }, { responseType: "blob" });
-      console.log('[✅ TTS 응답]', response);
+      const response = await axios.post(`${apiUrl}/api/tts`, { text: summaryText }, { responseType: "blob" });
       const audioBlob = new Blob([response.data], { type: "audio/mpeg" });
       const audioUrl = URL.createObjectURL(audioBlob);
 
-      const audio = new Audio(audioUrl); 
+      const audio = new Audio(audioUrl);
       audioRef.current = audio;
       setIsPlaying(true);
       audio.play()
-        .then(() => console.log("[🎧 재생 성공]"))
-        .catch(err => {
-          setIsPlaying(false);
-          console.error("[❌ 재생 실패]", err);
-        });
+        .then(() => {})
+        .catch(() => setIsPlaying(false));
 
       audio.addEventListener("ended", () => setIsPlaying(false));
       audio.addEventListener("pause", () => setIsPlaying(false));
-      
     } catch (error) {
       setIsPlaying(false);
-      alert('TTS 요청 실패:',error);
-      alert("음성 재생에 실패햇습니다.");
+      alert('TTS 요청 실패');
     }
-  },[serverUrl, summaryText]);
+  }, [apiUrl, summaryText]);
 
   // 최초 진입시 summary 자동 재생
   useEffect(() => {
@@ -67,11 +74,12 @@ export default function SummaryPage() {
     if (summaryText && isUserInteracted === "true") {
       playVoice();
     }
-  }, [serverUrl, summaryText, playVoice]);
+  }, [apiUrl, summaryText, playVoice]);
+
   // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
     stopVoice();
-    navigate('/camera'); // 다시 찍기로 카메라 화면 이동
+    navigate('/camera');
   };
 
   // ----------- 마이크 (녹음 토글) -----------
@@ -80,59 +88,49 @@ export default function SummaryPage() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const recorder = new MediaRecorder(stream);
-  
         const chunks = [];
-  
+
         recorder.ondataavailable = (e) => {
           chunks.push(e.data);
         };
-  
         recorder.onstop = async () => {
-          console.log("[🧪 chunks의 타입 체크]", chunks, Array.isArray(chunks));
-          if (!Array.isArray(chunks)) {
-            alert("⚠️ 오류: chunks가 배열이 아닙니다!");
-            return;
-          }
+          if (!Array.isArray(chunks)) return;
           const audioBlob = new Blob(chunks, { type: 'audio/mp3' });
-          setAudioChunks([]);  // 초기화
-  
+          setAudioChunks([]);
+
           // 업로드용 form 데이터
           const formData = new FormData();
           formData.append("file", audioBlob, "recording.mp3");
-  
+
           try {
-            const res = await axios.post(`${process.env.REACT_APP_API_SERVER_URL}/api/stt`, formData, {
+            const res = await axios.post(`${apiUrl}/api/stt`, formData, {
               headers: { "Content-Type": "multipart/form-data" },
               withCredentials: true,
             });
-            console.log("[✅ STT 결과]", res.data);
-
             // 👇 바로 질문 보내기
             const sttResult = res.data;
             if (sttResult && sttResult.trim().length > 0) {
               handleSend(sttResult);
             }
-
           } catch (err) {
-            console.error("[❌ STT 실패]", err);
             alert("STT 요청 실패");
           }
         };
-  
+
         recorder.start();
         setMediaRecorder(recorder);
         setIsRecording(true);
         setAudioChunks(chunks);
-  
       } catch (err) {
-        console.error("🎤 마이크 접근 실패", err);
         alert("마이크 권한이 필요합니다.");
       }
-  
-    } else {
-      mediaRecorder?.stop();
-      setIsRecording(false);
     }
+  };
+
+  // 녹음 중지 핸들러
+  const handleStopRecording = () => {
+    mediaRecorder?.stop();
+    setIsRecording(false);
   };
 
   // ----------- 전송 버튼 -----------
@@ -140,30 +138,29 @@ export default function SummaryPage() {
   const handleSend = async (text) => {
     const finalText = text || inputValue;
     if (!finalText.trim()) return;
-  
+
     // 질문 추가
     setChatList(prev => [
       ...prev,
       { type: 'question', text: finalText }
     ]);
     setInputValue('');
-  
+
     try {
-      const res = await axios.post(`${serverUrl}/api/ask`, {
+      const res = await axios.post(`${apiUrl}/api/ask`, {
         question: finalText
       }, {
         withCredentials: true
       });
-  
-      const answer = res.data?.answer || res.data.error  || '답변을 가져오지 못했습니다.';
-  
+
+      const answer = res.data?.answer || res.data.error || '답변을 가져오지 못했습니다.';
+
       // 답변 추가
       setChatList(prev => [
         ...prev,
         { type: 'answer', text: answer }
       ]);
     } catch (err) {
-      console.error("[❌ 질문 응답 실패]", err);
       setChatList(prev => [
         ...prev,
         { type: 'answer', text: '서버 오류로 답변을 가져오지 못했습니다.' }
@@ -229,25 +226,35 @@ export default function SummaryPage() {
         </div>
         {/* 하단 입력바 */}
         <div style={styles.bottomBar}>
-          {/* 마이크 버튼 */}
-          <button
-            style={{
-              ...styles.micButton,
-              background: isRecording ? '#ba2727' : '#f33d2d',
-              boxShadow: isRecording ? '0 0 0 2px #d36e6e' : styles.micButton.boxShadow
-            }}
-            onClick={handleMicClick}
-            title="음성 녹음"
-          >
-            <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-              <circle cx="45" cy="45" r="40" fill="#F44336"/>
-              <rect x="34" y="28" width="22" height="30" rx="11" fill="#fff"/>
-              <rect x="42" y="60" width="6" height="8" rx="2" fill="#fff"/>
-              <rect x="32" y="44" width="26" height="7" rx="3.5" fill="#fff"/>
-              
-            </svg>
-           
-          </button>
+          {/* 마이크 버튼 or 녹음 중 버튼 */}
+          {!isRecording ? (
+            <button
+              style={{
+                ...styles.micButton,
+                ...(pulse ? styles.micPulse : {}),
+              }}
+              onClick={handleMicClick}
+              title="음성 녹음"
+            >
+              <svg width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="22" fill="#F44336" />
+                <g>
+                  <rect x="17" y="11" width="10" height="18" rx="5" fill="#fff" />
+                  <rect x="21" y="31" width="2" height="4" rx="1" fill="#fff" />
+                  <rect x="16" y="23" width="12" height="3" rx="1.5" fill="#fff" />
+                </g>
+                {/* 마이크 아이콘, 필요시 더 예쁘게 */}
+              </svg>
+            </button>
+          ) : (
+            <button
+              style={styles.stopRecBtn}
+              onClick={handleStopRecording}
+            >
+              <span className="wave-ani" style={styles.waveAni} />
+              질문 끝내기
+            </button>
+          )}
           {/* 입력창 */}
           <input
             style={styles.input}
@@ -255,21 +262,44 @@ export default function SummaryPage() {
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={e => isSendActive && e.key === 'Enter' && handleSend()}
+            disabled={isRecording}
           />
-          {/* 전송 버튼 */}
-          <button
-            style={{
-              ...styles.sendButton,
-              background: isSendActive ? '#111' : '#f1f1f1',
-              color: isSendActive ? '#fff' : '#c0c0c0',
-              cursor: isSendActive ? 'pointer' : 'not-allowed',
-              border: isSendActive ? 'none' : '1.2px solid #ececec'
-            }}
-            onClick={isSendActive ? handleSend : undefined}
-            disabled={!isSendActive}
-          >전송</button>
+          {/* 전송 버튼 (녹음 중엔 숨김) */}
+          {!isRecording && (
+            <button
+              style={{
+                ...styles.sendButton,
+                background: isSendActive ? '#111' : '#f1f1f1',
+                color: isSendActive ? '#fff' : '#c0c0c0',
+                cursor: isSendActive ? 'pointer' : 'not-allowed',
+                border: isSendActive ? 'none' : '1.2px solid #ececec'
+              }}
+              onClick={isSendActive ? handleSend : undefined}
+              disabled={!isSendActive}
+            >전송</button>
+          )}
         </div>
       </div>
+      {/* 녹음중 애니메이션을 위한 스타일 */}
+      <style>
+        {`
+          .wave-ani {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #fff176;
+            margin-right: 8px;
+            box-shadow: 0 0 0 0 #fff176;
+            animation: wavePulse 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
+            vertical-align: middle;
+          }
+          @keyframes wavePulse {
+            0% { box-shadow: 0 0 0 0 #fff176; opacity: 1;}
+            70% { box-shadow: 0 0 0 10px rgba(255, 241, 118, 0.5); opacity: 0.7;}
+            100% { box-shadow: 0 0 0 0 #fff176; opacity: 0.2;}
+          }
+        `}
+      </style>
     </div>
   );
 }
@@ -335,7 +365,6 @@ const styles = {
     flexDirection: 'column',
     gap: 16,
   },
-  // summary(요약) 말풍선 - 넓게, 버튼과 하나의 박스!
   summaryBox: {
     alignSelf: 'flex-start',
     width: '90%',
@@ -386,7 +415,6 @@ const styles = {
     cursor: 'pointer',
     boxShadow: '0 1px 6px 0 rgba(30,30,30,0.10)'
   },
-  // 질문 말풍선 - 오른쪽, 파랑
   chatBubble: {
     maxWidth: '75%',
     padding: '13px 16px',
@@ -423,8 +451,8 @@ const styles = {
     position: 'relative'
   },
   micButton: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     borderRadius: '50%',
     background: '#f33d2d',
     border: 'none',
@@ -434,7 +462,31 @@ const styles = {
     marginRight: 7,
     boxShadow: '0 2px 8px 0 rgba(30,30,30,0.08)',
     cursor: 'pointer',
-    transition: 'background 0.1s'
+    transition: 'box-shadow 0.3s'
+  },
+  micPulse: {
+    boxShadow: '0 0 0 8px #ffd83588, 0 2px 8px 0 rgba(30,30,30,0.13)'
+  },
+  stopRecBtn: {
+    flex: 'none',
+    width: 220,
+    height: 44,
+    fontWeight: 700,
+    borderRadius: 22,
+    border: 'none',
+    background: '#ffd835',
+    color: '#333',
+    fontSize: 17,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 8px 0 rgba(230,200,50,0.10)',
+    cursor: 'pointer',
+    marginRight: 7,
+    transition: 'background 0.3s'
+  },
+  waveAni: {
+    marginRight: 8
   },
   input: {
     flex: 1,

@@ -57,3 +57,34 @@ body, html, #root {
     padding: 0.5rem;
   }
 }
+
+body, #root {
+  background: #fff;
+  color: #222;
+}
+
+/* 다크모드 지원 */
+@media (prefers-color-scheme: dark) {
+  body, #root {
+    background: #181A20;
+    color: #fafafa;
+  }
+  /* 주요 카드/버튼/입력창 등 다크배경, 글자색 보정 */
+  .dark-bg, .summaryBox, .chatBubble, .answerBubble, .questionBubble {
+    background: #23262f !important;
+    color: #fafafa !important;
+  }
+  .summaryText {
+    color: #fafafa !important;
+  }
+  input, textarea {
+    background: #292b35 !important;
+    color: #fafafa !important;
+    border-color: #3b3b3b !important;
+  }
+  button {
+    color: #181A20;
+  }
+}
+
+
