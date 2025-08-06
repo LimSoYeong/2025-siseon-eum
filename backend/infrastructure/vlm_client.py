@@ -1,4 +1,5 @@
 # infrastructure/vlm_client.py
+# 요약/설명만 출력되던 때 쓰던 레거시 코드
 
 from model.inference import run_inference
 

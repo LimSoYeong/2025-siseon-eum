@@ -1,4 +1,5 @@
 # routes/vlm_router.py
+# 요약/설명만 출력되던 때 쓰던 레거시 코드
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from infrastructure.vlm_client import extract_text_from_image
