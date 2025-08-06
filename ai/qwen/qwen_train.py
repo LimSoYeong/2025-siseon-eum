@@ -10,7 +10,7 @@ from pathlib import Path
 import torch
 
 # ✅ 모델과 프로세서는 이곳에서 import
-from backend.langserve_app.model_loader import get_model, get_processor
+from model_loader import get_model, get_processor
 
 # 경로 설정
 base_dir = Path(__file__).resolve().parent.parent

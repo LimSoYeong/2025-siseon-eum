@@ -1,12 +1,12 @@
-# ✅ backend/langserve_app/model_loader.py
+# ai/qwen/model_loader.py
 
 from functools import lru_cache
 import torch
 import gc
 import os
 
-# GPU 0번만 사용하도록 설정
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# GPU 1번만 사용하도록 설정
+os.environ["CUDA_VISIBLE_DEVICES"] = "1" 
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -18,7 +18,7 @@ def get_model():
     model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         "Qwen/Qwen2.5-VL-7B-Instruct",
         torch_dtype=torch.float16,
-        device_map={"": "cuda:0"}  # "cuda:0"은 실질적으로 GPU 0 (visible device index 기준)
+        device_map={"": "cuda:0"}  # "cuda:0"은 실제 GPU 1을 의미함
     )
     return model.eval()
 
