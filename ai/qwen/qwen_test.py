@@ -14,7 +14,7 @@ import torch
 import time
 
 # ✅ 모델과 프로세서는 이곳에서 import
-from backend.langserve_app.model_loader import get_model, get_processor
+from model_loader import get_model, get_processor
 
 total_time = 0 # 시간 계산용
 base_dir = Path(__file__).resolve().parent.parent # 현재 파일 기준으로 경로 설정 : KSEB/ai
