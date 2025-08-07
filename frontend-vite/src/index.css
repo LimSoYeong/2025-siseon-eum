@@ -1,4 +1,4 @@
-:root {
+/* :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -64,5 +64,94 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+} */
+
+
+:root {
+  /* 폰트, 레이아웃 */
+  --font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --line-height: 1.5;
+  --font-weight: 400;
+
+  /* 컬러 변수 (기본: 다크모드) */
+  --font-color: rgba(255, 255, 255, 0.87);
+  --bg-color: #242424;
+  --link-color: #646cff;
+  --link-hover: #535bf2;
+  --button-bg: #1a1a1a;
+  --button-border: transparent;
+  --button-hover-border: #646cff;
+
+  /* 라이트모드 전용 변수(아래에서 오버라이드) */
+  --font-color-light: #213547;
+  --bg-color-light: #ffffff;
+  --link-hover-light: #747bff;
+  --button-bg-light: #f9f9f9;
+
+  /* 폰트 렌더링 */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  font-family: var(--font-family);
+  line-height: var(--line-height);
+  font-weight: var(--font-weight);
+  color: var(--font-color);
+  background-color: var(--bg-color);
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+body {
+  display: flex;
+  place-items: center;
+}
+
+a {
+  font-weight: 500;
+  color: var(--link-color);
+  text-decoration: inherit;
+  transition: color 0.15s;
+}
+a:hover {
+  color: var(--link-hover);
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid var(--button-border);
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--button-bg);
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.2s;
+}
+button:hover {
+  border-color: var(--button-hover-border);
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* 라이트 모드: 변수 오버라이드 */
+@media (prefers-color-scheme: light) {
+  :root {
+    --font-color: var(--font-color-light);
+    --bg-color: var(--bg-color-light);
+    --link-hover: var(--link-hover-light);
+    --button-bg: var(--button-bg-light);
   }
 }
