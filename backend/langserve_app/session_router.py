@@ -3,6 +3,8 @@
 from fastapi import APIRouter, UploadFile, Response, Request, Cookie
 import uuid, shutil
 from .conversation_chain import ImageChatRunnable
+from infrastructure.vector_store import save_image_embedding #백터 DB에 저장
+from PIL import Image
 
 router = APIRouter(prefix="/api")
 sessions = {}
@@ -17,6 +19,11 @@ async def start_session(image: UploadFile, response: Response):
 
     sessions[user_id] = ImageChatRunnable(temp_path) # 세션 초기화
     initial_summary = sessions[user_id].invoke("이 문서에 대해 설명해줘.")
+    
+     #  벡터DB에 이미지 임베딩 저장
+    image_obj = Image.open(temp_path).convert("RGB")
+    save_image_embedding(user_id, image_obj, metadata=initial_summary)
+
 
     # 쿠키로 user_id 저장 (7일 유효)
     response.set_cookie(key="user_id", value=user_id, max_age=60*60*24*7, httponly=True, samesite="None", secure=True)
