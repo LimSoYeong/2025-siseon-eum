@@ -83,7 +83,8 @@ export default function SummaryPage() {
   // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
     stopVoice();
-    navigate('/camera');
+    // 카메라로 이동하면서 히스토리 정리: 뒤로가면 홈으로 가도록 카메라에서 replace 처리
+    navigate('/camera', { replace: true });
   };
 
   // ----------- 마이크 (녹음 토글) -----------

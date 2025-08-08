@@ -34,10 +34,10 @@ export default function LoadingPage() {
           }
         );
 
-        //  결과 받아서 summary 페이지로 이동
+        //  결과 받아서 summary 페이지로 이동 (히스토리 정리: /load를 대체)
         const summaryText = response.data.answer;
         sessionStorage.setItem('userInteracted', 'true');  //  사용자 인터랙션 기록
-        navigate('/summary', { state: { summary: summaryText } });
+        navigate('/summary', { state: { summary: summaryText }, replace: true });
       } catch (error) {
         console.error('서버 요청 실패:', error);
         alert('문서 분석에 실패했습니다.');
@@ -62,7 +62,7 @@ const styles = {
     minHeight: '100vh',
     display: 'flex', flexDirection: 'column',
     justifyContent: 'center', alignItems: 'center',
-    background: '#fff',
+    background: 'var(--bg-color)',
   },
   spinner: {
     width: 48,
@@ -74,7 +74,7 @@ const styles = {
     marginBottom: 20,
   },
   text: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  subtext: { fontSize: 16, color: '#666' },
+  subtext: { fontSize: 16 },
 };
 
 // CSS 애니메이션 추가

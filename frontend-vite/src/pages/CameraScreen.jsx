@@ -48,7 +48,7 @@ export default function CameraScreen() {
     }, 'image/jpeg');
   };
 
-  const goBack = () => navigate(-1);
+  const goBack = () => navigate('/home', { replace: true });
 
   return (
     <div style={styles.wrapper}>
