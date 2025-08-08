@@ -1,109 +1,97 @@
 import os
-import pickle
-import faiss
+from functools import lru_cache
+from typing import Dict
+
+import numpy as np
 import torch
-from typing import List
 from PIL import Image
+from transformers import CLIPModel, CLIPProcessor
 
-from langserve_app.model_loader import get_model, get_processor
-from qwen_vl_utils import process_vision_info
+from faiss_db.db import SimpleFaissDB
 
-model = get_model()
-processor = get_processor()
 
-VECTOR_DIR = "vector_store/image"
-os.makedirs(VECTOR_DIR, exist_ok=True)
+@lru_cache()
+def _get_device() -> str:
+    return "cuda:0" if torch.cuda.is_available() else "cpu"
 
-def save_image_embedding(client_id: str, image: Image.Image, metadata: str):
-    """
-    - 이미지 임베딩 벡터를 생성하여 사용자(client_id)별 FAISS 벡터 DB에 저장
-    - metadata (요약 결과 등)를 함께 저장
-    """
-    messages = [{"role": "user", "content": [{"type": "image", "image": image}]}]
 
+@lru_cache()
+def _get_clip_model() -> CLIPModel:
+    model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+    return model.to(_get_device()).eval()
+
+
+@lru_cache()
+def _get_clip_processor() -> CLIPProcessor:
+    return CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+
+@lru_cache()
+def _get_faiss_db() -> SimpleFaissDB:
+    # CLIP projection dimension은 512
+    dim = int(_get_clip_model().config.projection_dim)
+    db = SimpleFaissDB(dim)
+    # 인덱스가 있으면 로드
+    try:
+        if os.path.exists("faiss_db/index.faiss") and os.path.exists("faiss_db/index.pkl"):
+            db.load()
+    except Exception:
+        # 손상 시 새로 생성
+        pass
+    return db
+
+
+def _l2_normalize(x: np.ndarray) -> np.ndarray:
+    denom = np.linalg.norm(x) + 1e-12
+    return x / denom
+
+
+def encode_text_to_vec(text: str) -> np.ndarray:
+    inputs = _get_clip_processor()(text=[text], return_tensors="pt", padding=True)
+    inputs = {k: v.to(_get_device()) for k, v in inputs.items()}
     with torch.no_grad():
-        # Vision input 처리 (Qwen 기준)
-        image_inputs, _ = process_vision_info(messages)
-
-        # Dummy 텍스트 prompt (실제 추론 안 함)
-        prompt = "이 이미지를 설명해줘"
-        text = processor.apply_chat_template(
-            [{"role": "user", "content": [{"type": "image", "image": image}, {"type": "text", "text": prompt}]}],
-            tokenize=False,
-            add_generation_prompt=True
-        )
-
-        # Processor에 넣기
-        inputs = processor(
-            text=[text],
-            images=image_inputs["pixel_values"],
-            return_tensors="pt"
-        ).to(model.device)
-
-        # 진짜 임베딩 추출 (마지막 hidden state의 첫 토큰 기준)
-        outputs = model(**inputs, output_hidden_states=True)
-        image_embedding = outputs.hidden_states[-1][:, 0, :].cpu().numpy()  # shape: (1, hidden_dim)
-
-    # 저장 경로 설정
-    index_path = os.path.join(VECTOR_DIR, f"{client_id}_index.faiss")
-    meta_path = os.path.join(VECTOR_DIR, f"{client_id}_meta.pkl")
-
-    # 기존 DB가 있으면 로딩
-    if os.path.exists(index_path):
-        index = faiss.read_index(index_path)
-        try:
-            with open(meta_path, "rb") as f:
-                metadata_list = pickle.load(f)
-        except Exception:
-            metadata_list = []
-    else:
-        index = faiss.IndexFlatL2(image_embedding.shape[1])  # L2 거리 기반
-        metadata_list = []
-
-    # 벡터 추가
-    index.add(image_embedding)
-    metadata_list.append(metadata)
-
-    # 저장
-    faiss.write_index(index, index_path)
-    with open(meta_path, "wb") as f:
-        pickle.dump(metadata_list, f)
+        outputs = _get_clip_model().get_text_features(**inputs)
+    vec = outputs[0].detach().cpu().numpy().astype(np.float32)
+    return _l2_normalize(vec)
 
 
-def search_similar_images(client_id: str, query_image: Image.Image, top_k: int = 3) -> List[str]:
-    """
-    - 쿼리 이미지와 유사한 top_k 이미지를 검색
-    - metadata 리스트 반환
-    """
-    messages = [{"role": "user", "content": [{"type": "image", "image": query_image}]}]
-
+def encode_image_to_vec(image: Image.Image) -> np.ndarray:
+    inputs = _get_clip_processor()(images=image, return_tensors="pt")
+    inputs = {k: v.to(_get_device()) for k, v in inputs.items()}
     with torch.no_grad():
-        image_inputs, _ = process_vision_info(messages)
-        prompt = "이 이미지를 설명해줘"
-        text = processor.apply_chat_template(
-            [{"role": "user", "content": [{"type": "image", "image": query_image}, {"type": "text", "text": prompt}]}],
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        inputs = processor(
-            text=[text],
-            images=image_inputs["pixel_values"],
-            return_tensors="pt"
-        ).to(model.device)
+        outputs = _get_clip_model().get_image_features(**inputs)
+    vec = outputs[0].detach().cpu().numpy().astype(np.float32)
+    return _l2_normalize(vec)
 
-        outputs = model(**inputs, output_hidden_states=True)
-        query_embedding = outputs.hidden_states[-1][:, 0, :].cpu().numpy()
 
-    # 경로
-    index_path = os.path.join(VECTOR_DIR, f"{client_id}_index.faiss")
-    meta_path = os.path.join(VECTOR_DIR, f"{client_id}_meta.pkl")
+def save_image_embedding(image_path: str, user_id: str, extra_metadata: Dict = None) -> None:
+    image = Image.open(image_path).convert("RGB")
+    embedding = encode_image_to_vec(image)
+    metadata = {"type": "image", "path": image_path, "user_id": user_id}
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    # 이미지 항목의 본문 텍스트는 비워둠
+    _get_faiss_db().add(embedding, text="", metadata=metadata)
+    _get_faiss_db().save()
 
-    if not os.path.exists(index_path):
-        return []
 
-    index = faiss.read_index(index_path)
-    with open(meta_path, "rb") as f:
-        metadata_list = pickle.load(f)
+def save_text_embedding(text: str, user_id: str, extra_metadata: Dict = None) -> None:
+    embedding = encode_text_to_vec(text)
+    metadata = {"type": "text", "user_id": user_id}
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    _get_faiss_db().add(embedding, text=text, metadata=metadata)
+    _get_faiss_db().save()
 
-    D, I = index.search(query_embedding, top_k)
-    return [metadata_list[i] for i in I[0] if i < len(metadata_list)]
+
+def search_by_text(query: str, k: int = 5):
+    q = encode_text_to_vec(query)
+    return _get_faiss_db().search(q, k=k)
+
+
+def search_by_image(image_path: str, k: int = 5):
+    image = Image.open(image_path).convert("RGB")
+    q = encode_image_to_vec(image)
+    return _get_faiss_db().search(q, k=k)
+
+
