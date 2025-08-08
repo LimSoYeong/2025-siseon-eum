@@ -9,6 +9,8 @@ from langchain.schema import HumanMessage, AIMessage
 import time
 
 from functools import lru_cache
+from faiss_db.db import SimpleFaissDB
+import numpy as np
 
 @lru_cache
 def _get_model():
@@ -19,7 +21,7 @@ def _get_processor():
     return get_processor()
 
 class ConversationSession:
-    def __init__(self, img_path, initial_prompt: str = "이 이미지를 노인을 위해 쉽게 설명해줘"):
+    def __init__(self, img_path):
         self.image = Image.open(img_path).convert("RGB")
         self.memory = ConversationBufferMemory(return_messages=True)
 
@@ -38,6 +40,7 @@ class ConversationSession:
             image_inputs, _ = process_vision_info(messages)
         end_embedd = time.time()
         print(f"[DEBUG] process_vision_info 소요 시간: {round(end_embedd - start_embedd, 2)}초")
+        # Qwen-VL 유틸은 images를 리스트(PIL.Image 등)로 반환하며, processor(images=...)에 그대로 넣어야 함
         return image_inputs
 
     def ask(self, user_input: str) -> str:
@@ -48,10 +51,8 @@ class ConversationSession:
         # 템플릿 생성
         text = _get_processor().apply_chat_template(self.messages, tokenize=False, add_generation_prompt=True)
 
-        # 텍스트 토크나이즈
-        inputs = _get_processor()(
-                    text=[text], images=self.image_features, return_tensors="pt"
-                ).to(_get_model().device)
+        # 텍스트 + 이미지 동시 토크나이즈 (이미지는 캐시된 image_inputs를 재사용)
+        inputs = _get_processor()(text=[text], images=self.image_features, return_tensors="pt").to(_get_model().device)
 
         # 추론
         inference_start = time.time()
