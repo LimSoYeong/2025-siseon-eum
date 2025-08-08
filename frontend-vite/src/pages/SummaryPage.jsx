@@ -7,6 +7,7 @@ export default function SummaryPage() {
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL;
   const summaryText = location.state?.summary || '';
+  const docId = location.state?.docId;
   const audioRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -180,6 +181,20 @@ export default function SummaryPage() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatList]);
+
+  // 대화 로드 (docId가 있을 때)
+  useEffect(() => {
+    const load = async () => {
+      if (!docId) return;
+      try {
+        const res = await fetch(`${apiUrl}/api/conversation?doc_id=${encodeURIComponent(docId)}`, { credentials: 'include' });
+        const data = await res.json();
+        const msgs = (data.messages || []).map(m => ({ type: m.role === 'assistant' ? 'answer' : 'question', text: m.text }));
+        if (msgs.length) setChatList(msgs);
+      } catch {}
+    };
+    load();
+  }, [apiUrl, docId]);
 
   return (
     <div style={styles.page}>

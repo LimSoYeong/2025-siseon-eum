@@ -1,6 +1,6 @@
 // LoadingPage.js
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
@@ -11,6 +11,7 @@ export default function LoadingPage() {
   const apiUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
+    const ranRef = useRef || null;
     const analyzeImage = async () => {
 
       if (!imageBlob) {
@@ -36,8 +37,9 @@ export default function LoadingPage() {
 
         //  결과 받아서 summary 페이지로 이동 (히스토리 정리: /load를 대체)
         const summaryText = response.data.answer;
+        const docId = response.data.doc_id;
         sessionStorage.setItem('userInteracted', 'true');  //  사용자 인터랙션 기록
-        navigate('/summary', { state: { summary: summaryText }, replace: true });
+        navigate('/summary', { state: { summary: summaryText, docId }, replace: true });
       } catch (error) {
         console.error('서버 요청 실패:', error);
         alert('문서 분석에 실패했습니다.');
@@ -45,7 +47,13 @@ export default function LoadingPage() {
       }
     };
 
-    analyzeImage();
+    // StrictMode 이중 호출 방지: 1회 가드
+    if (!LoadingPage.__ranOnce) {
+      LoadingPage.__ranOnce = true;
+      analyzeImage();
+      // 1초 후 해제하여 다른 세션에서는 다시 동작
+      setTimeout(() => { LoadingPage.__ranOnce = false; }, 1000);
+    }
   }, [apiUrl, navigate, imageBlob]);
 
   return (
