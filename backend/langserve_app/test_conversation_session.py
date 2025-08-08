@@ -21,7 +21,7 @@ session = ConversationSession(image_path)
 
 # 첫 설명
 print("📝 첫 설명:")
-print(session.ask("이 문서에 대해 설명해줘."))
+print(session.ask(""))
 
 # 질문 1
 print("\n❓ 이거는 어디에서 찍은 사진이야?")
