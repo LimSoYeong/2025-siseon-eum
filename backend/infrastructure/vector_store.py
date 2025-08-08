@@ -8,6 +8,7 @@ from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 
 from faiss_db.db import SimpleFaissDB
+from typing import List, Optional
 
 
 @lru_cache()
@@ -93,5 +94,47 @@ def search_by_image(image_path: str, k: int = 5):
     image = Image.open(image_path).convert("RGB")
     q = encode_image_to_vec(image)
     return _get_faiss_db().search(q, k=k)
+
+
+def list_recent_docs(user_id: str, limit: int = 10) -> List[dict]:
+    """FAISS 메타데이터에서 해당 사용자의 이미지 항목을 찾아 최근순으로 반환.
+    간단한 페어링: 이미지 다음에 등장하는 summary/summary_snippet 텍스트를 제목으로 사용.
+    """
+    db = _get_faiss_db()
+    items = []
+    # 인덱스 순회하며 이미지 항목 수집
+    for i, meta in enumerate(db.metadatas):
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("type") == "image" and meta.get("user_id") == user_id:
+            path = meta.get("path")
+            # 생성시간 추정: 파일 mtime이 없으면 메타에 timestamp 없으므로 현재시간으로 대체
+            try:
+                mtime = os.path.getmtime(path) if path and os.path.exists(path) else 0
+            except Exception:
+                mtime = 0
+            # 제목 후보: 인접 텍스트 항목 + doc_id 주입
+            title: Optional[str] = None
+            doc_id = meta.get("doc_id")
+            for j in range(i + 1, min(i + 6, len(db.texts))):
+                meta_j = db.metadatas[j]
+                if isinstance(meta_j, dict) and meta_j.get("user_id") == user_id and meta_j.get("type") == "text":
+                    src = meta_j.get("source")
+                    if src in {"summary_snippet", "summary"}:
+                        title = db.texts[j]
+                        break
+            items.append({"path": path, "mtime": mtime, "title": title or "문서", "doc_id": doc_id})
+
+    # 중복 제거: doc_id 우선, 없으면 path 기준
+    seen = set()
+    unique_items = []
+    for it in sorted(items, key=lambda x: x.get("mtime", 0), reverse=True):
+        key = it.get("doc_id") or it.get("path")
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        unique_items.append(it)
+    return unique_items[:limit]
 
 
