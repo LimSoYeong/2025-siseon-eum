@@ -18,6 +18,7 @@ export default function HomeScreen() {
         });
         const data = await res.json();
         const items = (data.items || []).map(it => ({
+          docId: it.doc_id || String(it.mtime || ''),
           date: new Date((it.mtime || 0) * 1000).toLocaleDateString('ko-KR').slice(2),
           title: it.title || '문서',
           thumb: `${import.meta.env.VITE_API_URL}/api/image?path=${encodeURIComponent(it.path || '')}`
@@ -35,7 +36,7 @@ export default function HomeScreen() {
       <div style={styles.recentTitle}>최근 찍은 문서 보기</div>
       <div style={styles.docsWrap}>
         {docs.map((doc, i) => (
-          <div key={i} style={styles.docCard}>
+          <div key={i} style={styles.docCard} onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId } })}>
             <div>
               <div style={styles.docDate}>{doc.date}</div>
               <div style={styles.docTitle}>{doc.title}</div>
@@ -48,10 +49,12 @@ export default function HomeScreen() {
           </div>
         ))}
       </div>
-      <button style={styles.cameraBtn} onClick={handleStartCamera}>
-        <span style={styles.cameraIcon} role="img" aria-label="camera">📷</span>
-        문서 촬영
-      </button>
+      <div style={styles.footerBar}>
+        <button style={styles.cameraBtn} onClick={handleStartCamera}>
+          <span style={styles.cameraIcon} role="img" aria-label="camera">📷</span>
+          문서 촬영
+        </button>
+      </div>
     </div>
   );
 }
@@ -60,7 +63,7 @@ const styles = {
   container: {
     width: '100%',
     maxWidth: 480,
-    minHeight: '100vh',
+    minHeight: '100dvh',
     margin: '0 auto',
     borderRadius: 0,
     background: 'transparent',
@@ -69,7 +72,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'flex-start',
     boxSizing: 'border-box',
-    padding: '20px 0 20px 0',
+    padding: '20px 0 0 0',
     position: 'relative',
   },
   recentTitle: {
@@ -88,8 +91,20 @@ const styles = {
     overflowY: 'auto',
     WebkitOverflowScrolling: 'touch',
     marginBottom: 0,
-    padding: '0 20px 80px 20px', // 하단 버튼 공간 확보
+    padding: '0 20px 140px 20px', // 하단 고정 버튼 공간 확보
     boxSizing: 'border-box',
+  },
+  footerBar: {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '12px 0 calc(env(safe-area-inset-bottom) + 12px) 0',
+    background: 'var(--bg-color)',
+    boxShadow: '0 -2px 6px rgba(0,0,0,0.04)'
   },
   docCard: {
     display: 'flex',
@@ -140,7 +155,7 @@ const styles = {
     cursor: 'pointer',
     justifyContent: 'center',
     boxShadow: '0 1px 4px 0 rgba(0,0,0,0.04)',
-    margin: '12px 20px 12px 20px',
+    margin: 0,
   },
   cameraIcon: {
     fontSize: 25,
