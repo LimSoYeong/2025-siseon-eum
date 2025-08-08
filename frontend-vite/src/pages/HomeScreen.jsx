@@ -39,7 +39,7 @@ export default function HomeScreen() {
           <div key={i} style={styles.docCard} onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId, fromHome: true } })}>
             <div>
               <div style={styles.docDate}>{doc.date}</div>
-              <div style={styles.docTitle}>{doc.title}</div>
+              <div style={styles.docTitle}>문서</div>
             </div>
             <div style={styles.docThumbnail}>
               {doc.thumb && (
