@@ -32,3 +32,4 @@ ssl
 node_modules
 node_modules/*
 backend/data/
+backend/faiss_db
