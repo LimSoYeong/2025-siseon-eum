@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function HomeScreen() {
@@ -8,10 +8,27 @@ export default function HomeScreen() {
     navigate('/camera');
   };
 
-  const docs = [
-    { date: '25.07.02', title: '대학병원 약봉투' },
-    { date: '25.07.01', title: '건강보험 납부' },
-  ];
+  const [docs, setDocs] = useState([]);
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/recent_docs`, {
+          credentials: 'include'
+        });
+        const data = await res.json();
+        const items = (data.items || []).map(it => ({
+          date: new Date((it.mtime || 0) * 1000).toLocaleDateString('ko-KR').slice(2),
+          title: it.title || '문서',
+          thumb: `${import.meta.env.VITE_API_URL}/api/image?path=${encodeURIComponent(it.path || '')}`
+        }));
+        setDocs(items);
+      } catch (e) {
+        setDocs([]);
+      }
+    };
+    fetchDocs();
+  }, []);
 
   return (
     <div style={styles.container}>
@@ -23,7 +40,11 @@ export default function HomeScreen() {
               <div style={styles.docDate}>{doc.date}</div>
               <div style={styles.docTitle}>{doc.title}</div>
             </div>
-            <div style={styles.docThumbnail}></div>
+            <div style={styles.docThumbnail}>
+              {doc.thumb && (
+                <img src={doc.thumb} alt="thumb" style={{width: '100%', height:'100%', objectFit:'cover', borderRadius:8}} />
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -46,9 +67,9 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     boxSizing: 'border-box',
-    padding: '38px 0 38px 0',
+    padding: '20px 0 20px 0',
     position: 'relative',
   },
   recentTitle: {
@@ -63,9 +84,12 @@ const styles = {
     flexDirection: 'column',
     gap: 10,
     width: '100%',
-    marginBottom: 34,
-    padding: '0 20px', // 카드가 절대 안튀어나가게
-    boxSizing: 'border-box'
+    flex: 1,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    marginBottom: 0,
+    padding: '0 20px 80px 20px', // 하단 버튼 공간 확보
+    boxSizing: 'border-box',
   },
   docCard: {
     display: 'flex',
@@ -73,24 +97,24 @@ const styles = {
     alignItems: 'center',
     border: '1.2px solid rgba(200,200,200,0.3)',
     borderRadius: 12,
-    padding: '12px 14px',
+    padding: '20px 20px',
     background: 'var(--bg-color)',
     boxShadow: '0 2px 6px 0 rgba(30,30,30,0.03)',
     width: '100%',
     boxSizing: 'border-box'
   },
   docDate: {
-    fontSize: 12,
+    fontSize: 15,
     color: 'var(--font-color)',
     marginBottom: 2,
   },
   docTitle: {
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: 500,
   },
   docThumbnail: {
-    width: 32,
-    height: 32,
+    width: 50,
+    height: 50,
     borderRadius: 8,
     background: '#444',
     marginLeft: 8,
@@ -105,9 +129,9 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    width: 240,
-    height: 42,
-    fontSize: 16,
+    width: 'calc(100% - 40px)',
+    height: 55,
+    fontSize: 20,
     fontWeight: 500,
     border: '1.5px solid #222',
     borderRadius: 8,
@@ -115,10 +139,11 @@ const styles = {
     color: 'var(--font-color)',
     cursor: 'pointer',
     justifyContent: 'center',
-    boxShadow: '0 1px 4px 0 rgba(0,0,0,0.04)'
+    boxShadow: '0 1px 4px 0 rgba(0,0,0,0.04)',
+    margin: '12px 20px 12px 20px',
   },
   cameraIcon: {
-    fontSize: 20,
+    fontSize: 25,
     marginRight: 5,
   }
 };
