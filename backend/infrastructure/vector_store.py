@@ -48,7 +48,14 @@ def _l2_normalize(x: np.ndarray) -> np.ndarray:
 
 
 def encode_text_to_vec(text: str) -> np.ndarray:
-    inputs = _get_clip_processor()(text=[text], return_tensors="pt", padding=True)
+    # CLIP 텍스트 최대 길이는 77 토큰. 초과 시 잘라 오류 방지
+    inputs = _get_clip_processor()(
+        text=[text],
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=77,
+    )
     inputs = {k: v.to(_get_device()) for k, v in inputs.items()}
     with torch.no_grad():
         outputs = _get_clip_model().get_text_features(**inputs)

@@ -38,7 +38,11 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
     append_message(user_id, doc_id, "assistant", initial_summary)
     # 요약 텍스트도 벡터DB에 저장
     try:
-        save_text_embedding(initial_summary, user_id=user_id, extra_metadata={"source": "summary", "doc_id": doc_id})
+        # 길면 CLIP 한도를 넘기므로 요약을 200자로 우선 절단
+        safe_summary = (initial_summary or "").strip()
+        if len(safe_summary) > 200:
+            safe_summary = safe_summary[:200] + "…"
+        save_text_embedding(safe_summary, user_id=user_id, extra_metadata={"source": "summary", "doc_id": doc_id})
     except Exception as e:
         print(f"[WARN] save_text_embedding 실패: {e}")
 
@@ -48,8 +52,9 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
         value=user_id,
         max_age=60*60*24*7,
         httponly=True,
-        # 로컬 개발 환경 호환성을 위해 Lax/secure=False 권장. 배포 시 None/True로 전환
-        samesite="Lax",
+        # 로컬 개발: 서로 다른 호스트(127.0.0.1 vs localhost) 간에도 전송되도록 None
+        # 배포 시 None/True로 전환
+        samesite="None"
         secure=False,
     )
     print("세션이 시작되었습니다.")
