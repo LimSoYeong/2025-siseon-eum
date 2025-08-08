@@ -16,7 +16,7 @@ function App() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        background: "#fff"
+        background: "var(--bg-color)"
       }}
     >
       <BrowserRouter>

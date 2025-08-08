@@ -37,18 +37,18 @@ export default function HomeScreen() {
 
 const styles = {
   container: {
-    width: 320,
-    minHeight: '80vh',
-    margin: '40px auto',
-    // border: '4px solid #eee',  // 회색 테두리
-    borderRadius: 18,
-    background: '#fff',
+    width: '100%',
+    maxWidth: 480,
+    minHeight: '100vh',
+    margin: '0 auto',
+    borderRadius: 0,
+    background: 'transparent',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-between',
     boxSizing: 'border-box',
-    padding: '38px 0 38px 0',  // 아래 패딩 넉넉히!
+    padding: '38px 0 38px 0',
     position: 'relative',
   },
   recentTitle: {
@@ -71,17 +71,17 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    border: '1.2px solid #ddd',
+    border: '1.2px solid rgba(200,200,200,0.3)',
     borderRadius: 12,
     padding: '12px 14px',
-    background: '#fff',
+    background: 'var(--bg-color)',
     boxShadow: '0 2px 6px 0 rgba(30,30,30,0.03)',
     width: '100%',
     boxSizing: 'border-box'
   },
   docDate: {
     fontSize: 12,
-    color: '#888',
+    color: 'var(--font-color)',
     marginBottom: 2,
   },
   docTitle: {
@@ -111,8 +111,8 @@ const styles = {
     fontWeight: 500,
     border: '1.5px solid #222',
     borderRadius: 8,
-    background: '#fff',
-    color: '#222',
+    background: 'var(--bg-color)',
+    color: 'var(--font-color)',
     cursor: 'pointer',
     justifyContent: 'center',
     boxShadow: '0 1px 4px 0 rgba(0,0,0,0.04)'
