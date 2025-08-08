@@ -1,3 +1,5 @@
+//---------tailwind css 적용----------
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -10,20 +12,16 @@ export default function SummaryPage() {
   const audioRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [ttsLoading, setTtsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [chatList, setChatList] = useState([
     { type: 'summary', text: summaryText }
   ]);
-
-  // STT
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
-
-  // 애니메이션용 state (파동)
   const [pulse, setPulse] = useState(false);
 
-  // 녹음 애니메이션(파동) 타이머 관리
   useEffect(() => {
     let interval;
     if (isRecording) {
@@ -44,31 +42,33 @@ export default function SummaryPage() {
     setIsPlaying(false);
   };
 
-  // ----------- "다시 듣기" 기능 -----------
   const playVoice = useCallback(async () => {
     stopVoice();
     if (!summaryText) return;
+
     try {
-      const response = await axios.post(`${apiUrl}/api/tts`, { text: summaryText }, { responseType: "blob" });
+      setTtsLoading(true);
+      const response = await axios.post(
+        `${apiUrl}/api/tts`,
+        { text: summaryText },
+        { responseType: "blob" }
+      );
       const audioBlob = new Blob([response.data], { type: "audio/mpeg" });
       const audioUrl = URL.createObjectURL(audioBlob);
-
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       setIsPlaying(true);
-      audio.play()
-        .then(() => {})
-        .catch(() => setIsPlaying(false));
-
+      audio.play().catch(() => setIsPlaying(false));
       audio.addEventListener("ended", () => setIsPlaying(false));
       audio.addEventListener("pause", () => setIsPlaying(false));
     } catch (error) {
       setIsPlaying(false);
       alert('TTS 요청 실패');
+    } finally {
+      setTtsLoading(false);
     }
   }, [apiUrl, summaryText]);
 
-  // 최초 진입시 summary 자동 재생
   useEffect(() => {
     const isUserInteracted = window.sessionStorage.getItem("userInteracted");
     if (summaryText && isUserInteracted === "true") {
@@ -76,38 +76,29 @@ export default function SummaryPage() {
     }
   }, [apiUrl, summaryText, playVoice]);
 
-  // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
     stopVoice();
     navigate('/camera');
   };
 
-  // ----------- 마이크 (녹음 토글) -----------
   const handleMicClick = async () => {
     if (!isRecording) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
+        const recorder = new window.MediaRecorder(stream);
         const chunks = [];
-
-        recorder.ondataavailable = (e) => {
-          chunks.push(e.data);
-        };
+        recorder.ondataavailable = (e) => { chunks.push(e.data); };
         recorder.onstop = async () => {
           if (!Array.isArray(chunks)) return;
           const audioBlob = new Blob(chunks, { type: 'audio/mp3' });
           setAudioChunks([]);
-
-          // 업로드용 form 데이터
           const formData = new FormData();
           formData.append("file", audioBlob, "recording.mp3");
-
           try {
             const res = await axios.post(`${apiUrl}/api/stt`, formData, {
               headers: { "Content-Type": "multipart/form-data" },
               withCredentials: true,
             });
-            // 👇 바로 질문 보내기
             const sttResult = res.data;
             if (sttResult && sttResult.trim().length > 0) {
               handleSend(sttResult);
@@ -116,7 +107,6 @@ export default function SummaryPage() {
             alert("STT 요청 실패");
           }
         };
-
         recorder.start();
         setMediaRecorder(recorder);
         setIsRecording(true);
@@ -127,35 +117,26 @@ export default function SummaryPage() {
     }
   };
 
-  // 녹음 중지 핸들러
   const handleStopRecording = () => {
     mediaRecorder?.stop();
     setIsRecording(false);
   };
 
-  // ----------- 전송 버튼 -----------
   const isSendActive = inputValue.trim().length > 0;
+
   const handleSend = async (text) => {
     const finalText = text || inputValue;
     if (!finalText.trim()) return;
-
-    // 질문 추가
     setChatList(prev => [
       ...prev,
       { type: 'question', text: finalText }
     ]);
     setInputValue('');
-
     try {
       const res = await axios.post(`${apiUrl}/api/ask`, {
         question: finalText
-      }, {
-        withCredentials: true
-      });
-
+      }, { withCredentials: true });
       const answer = res.data?.answer || res.data.error || '답변을 가져오지 못했습니다.';
-
-      // 답변 추가
       setChatList(prev => [
         ...prev,
         { type: 'answer', text: answer }
@@ -168,7 +149,6 @@ export default function SummaryPage() {
     }
   };
 
-  // ----------- 채팅 스크롤 하단 고정 -----------
   const chatEndRef = useRef();
   useEffect(() => {
     if (chatEndRef.current) {
@@ -177,33 +157,40 @@ export default function SummaryPage() {
   }, [chatList]);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="w-[360px] h-[600px] max-w-full mx-auto rounded-[18px] bg-white flex flex-col relative overflow-hidden">
         {/* 상단바 */}
-        <div style={styles.topBar}>
-          <button style={styles.backBtn} onClick={handleBack}>&larr;</button>
-          <span style={styles.topTitle}>다시 찍기</span>
+        <div className="w-full h-11 bg-white flex items-center rounded-t-[14px] mb-0 justify-start shrink-0 box-border pl-0">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex items-center bg-[#111] text-white border-none rounded-[8px] text-[17px] font-normal px-[16px] pr-[22px] h-10 min-w-[135px] box-border cursor-pointer ml-[15px] hover:bg-[#222] hover:text-[#ffd835] transition-colors"
+          >
+            <span className="text-[22px] mr-[9px] ml-[-2px] font-normal inline-block">&lt;</span>
+            다시 찍기
+          </button>
         </div>
         {/* 채팅 영역 */}
-        <div style={styles.chatArea}>
+        <div className="flex-1 w-full py-[18px] px-[10px] bg-white overflow-y-auto flex flex-col gap-4">
           {chatList.map((msg, idx) =>
             msg.type === 'summary' || msg.type === 'answer' ? (
-              <div key={idx} style={styles.summaryBox}>
-                <div style={styles.summaryText}>{msg.text}</div>
-                <div style={styles.voiceBtnBox}>
+              <div key={idx} className="self-start w-[90%] bg-[#fcfafb] rounded-[18px] px-4 pt-4 pb-3 mb-1 shadow-[0_1px_6px_0_rgba(50,50,50,0.04)] flex flex-col gap-2.5">
+                <div className="text-[#222] text-[15.5px] leading-[1.6] whitespace-pre-line mb-1 break-words">{msg.text}</div>
+                <div className="flex mt-[2px]">
                   {!isPlaying ? (
                     <button
-                      style={styles.playBtn}
+                      className="flex items-center bg-[#25c03b] text-white border-none rounded-[8px] py-2 px-5 font-semibold text-[17px] shadow-[0_1px_6px_0_rgba(30,30,30,0.08)]"
                       onClick={playVoice}
+                      disabled={ttsLoading}
                     >
-                      <span style={{ marginRight: 4, fontSize: 17 }}>▶</span> 다시듣기
+                      <span className="mr-1 text-[17px]">▶</span> 다시듣기
                     </button>
                   ) : (
                     <button
-                      style={styles.stopBtn}
+                      className="flex items-center bg-[#f78427] text-white border-none rounded-[8px] py-2 px-5 font-semibold text-[17px] shadow-[0_1px_6px_0_rgba(30,30,30,0.10)]"
                       onClick={stopVoice}
                     >
-                      <span style={{ marginRight: 4, fontSize: 17 }}>■</span> 음성중지
+                      <span className="mr-1 text-[17px]">■</span> 음성중지
                     </button>
                   )}
                 </div>
@@ -211,12 +198,12 @@ export default function SummaryPage() {
             ) : (
               <div
                 key={idx}
-                style={{
-                  ...styles.chatBubble,
-                  ...(msg.type === 'question'
-                    ? styles.questionBubble
-                    : styles.answerBubble)
-                }}
+                className={[
+                  "max-w-[75%] py-[13px] px-4 rounded-[14px] text-[15.5px] leading-[1.55] break-all mb-1 flex flex-col",
+                  msg.type === 'question'
+                    ? "self-end bg-[#e7f1ff] text-[#1d3d68]"
+                    : "self-start bg-[#e9ffe7] text-[#244e23]"
+                ].join(" ")}
               >
                 {msg.text}
               </div>
@@ -225,16 +212,17 @@ export default function SummaryPage() {
           <div ref={chatEndRef} />
         </div>
         {/* 하단 입력바 */}
-        <div style={styles.bottomBar}>
+        <div className="w-full min-h-[56px] flex items-center gap-2 px-3 pt-3 pb-3.5 bg-white rounded-b-[14px] box-border shrink-0 relative flex-nowrap">
           {/* 마이크 버튼 or 녹음 중 버튼 */}
           {!isRecording ? (
             <button
-              style={{
-                ...styles.micButton,
-                ...(pulse ? styles.micPulse : {}),
-              }}
+              className={[
+                "w-14 h-14 rounded-full bg-[#f33d2d] border-none flex items-center justify-center mr-2 shadow-[0_2px_8px_0_rgba(30,30,30,0.08)] cursor-pointer transition-shadow",
+                pulse ? "shadow-[0_0_0_8px_#ffd83588,0_2px_8px_0_rgba(30,30,30,0.13)]" : ""
+              ].join(" ")}
               onClick={handleMicClick}
               title="음성 녹음"
+              disabled={ttsLoading}
             >
               <svg width="44" height="44" viewBox="0 0 44 44">
                 <circle cx="22" cy="22" r="22" fill="#F44336" />
@@ -243,56 +231,52 @@ export default function SummaryPage() {
                   <rect x="21" y="31" width="2" height="4" rx="1" fill="#fff" />
                   <rect x="16" y="23" width="12" height="3" rx="1.5" fill="#fff" />
                 </g>
-                {/* 마이크 아이콘, 필요시 더 예쁘게 */}
               </svg>
             </button>
           ) : (
             <button
-              style={styles.stopRecBtn}
+              className="flex-none w-[220px] h-11 font-bold rounded-[22px] border-none bg-[#ffd835] text-[#333] text-[17px] flex items-center justify-center shadow-[0_2px_8px_0_rgba(230,200,50,0.10)] cursor-pointer mr-2 transition-colors"
               onClick={handleStopRecording}
             >
-              <span className="wave-ani" style={styles.waveAni} />
+              <span
+                className="inline-block w-[10px] h-[10px] rounded-full bg-[#fff176] mr-2 align-middle"
+                style={{
+                  boxShadow: "0 0 0 0 #fff176",
+                  animation: "wavePulse 1s infinite cubic-bezier(0.4, 0, 0.2, 1)"
+                }}
+              />
               질문 끝내기
             </button>
           )}
           {/* 입력창 */}
           <input
-            style={styles.input}
+            className="flex-1 min-w-0 h-[38px] border border-[#e0e0e0] rounded-[16px] px-3 text-[15px] outline-none mr-1 bg-white"
             placeholder="질문을 입력하세요"
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={e => isSendActive && e.key === 'Enter' && handleSend()}
-            disabled={isRecording}
+            disabled={isRecording || ttsLoading}
           />
           {/* 전송 버튼 (녹음 중엔 숨김) */}
           {!isRecording && (
             <button
-              style={{
-                ...styles.sendButton,
-                background: isSendActive ? '#111' : '#f1f1f1',
-                color: isSendActive ? '#fff' : '#c0c0c0',
-                cursor: isSendActive ? 'pointer' : 'not-allowed',
-                border: isSendActive ? 'none' : '1.2px solid #ececec'
-              }}
-              onClick={isSendActive ? handleSend : undefined}
-              disabled={!isSendActive}
-            >전송</button>
+              className={[
+                "h-[38px] min-w-[60px] flex-shrink-0 font-semibold rounded-[13px] text-[15px] flex items-center justify-center leading-none px-5 font-sans transition-colors",
+                isSendActive
+                  ? "bg-[#111] text-white cursor-pointer border-none"
+                  : "bg-[#f1f1f1] text-[#c0c0c0] cursor-not-allowed border border-[#ececec]"
+              ].join(" ")}
+              onClick={isSendActive && !ttsLoading ? handleSend : undefined}
+              disabled={!isSendActive || ttsLoading}
+            >
+              {ttsLoading ? '음성 생성 중...' : '전송'}
+            </button>
           )}
         </div>
       </div>
-      {/* 녹음중 애니메이션을 위한 스타일 */}
+      {/* 녹음중 애니메이션 키프레임 (inline style 적용용) */}
       <style>
         {`
-          .wave-ani {
-            display: inline-block;
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            background: #fff176;
-            margin-right: 8px;
-            box-shadow: 0 0 0 0 #fff176;
-            animation: wavePulse 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
-            vertical-align: middle;
-          }
           @keyframes wavePulse {
             0% { box-shadow: 0 0 0 0 #fff176; opacity: 1;}
             70% { box-shadow: 0 0 0 10px rgba(255, 241, 118, 0.5); opacity: 0.7;}
@@ -304,209 +288,3 @@ export default function SummaryPage() {
   );
 }
 
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#fff',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  container: {
-    width: 360,
-    height: 600,
-    maxWidth: '100vw',
-    margin: '0 auto',
-    border: 'none',
-    borderRadius: 18,
-    background: '#fff',
-    display: 'flex',
-    flexDirection: 'column',
-    boxSizing: 'border-box',
-    position: 'relative',
-    overflow: 'hidden'
-  },
-  topBar: {
-    height: 44,
-    width: '100%',
-    background: '#111',
-    display: 'flex',
-    alignItems: 'center',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    marginBottom: 0,
-    justifyContent: 'flex-start',
-    flexShrink: 0,
-  },
-  backBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#fff',
-    fontSize: 22,
-    marginLeft: 12,
-    cursor: 'pointer',
-    outline: 'none'
-  },
-  topTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 500,
-    marginLeft: 7,
-    letterSpacing: -1,
-  },
-  chatArea: {
-    flex: 1,
-    width: '100%',
-    padding: '18px 10px 18px 10px',
-    background: '#fff',
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  summaryBox: {
-    alignSelf: 'flex-start',
-    width: '90%',
-    background: '#fcfafb',
-    borderRadius: 18,
-    padding: '16px 16px 11px 16px',
-    marginBottom: 2,
-    boxShadow: '0 1px 6px 0 rgba(50,50,50,0.04)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  summaryText: {
-    color: '#222',
-    fontSize: 15.5,
-    lineHeight: 1.6,
-    wordBreak: 'break-word',
-    marginBottom: 4,
-    whiteSpace: 'pre-line'
-  },
-  voiceBtnBox: {
-    display: 'flex',
-    marginTop: 2,
-  },
-  playBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    background: '#25c03b',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    padding: '8px 20px',
-    fontWeight: 600,
-    fontSize: 17,
-    cursor: 'pointer',
-    boxShadow: '0 1px 6px 0 rgba(30,30,30,0.08)'
-  },
-  stopBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    background: '#f78427',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    padding: '8px 20px',
-    fontWeight: 600,
-    fontSize: 17,
-    cursor: 'pointer',
-    boxShadow: '0 1px 6px 0 rgba(30,30,30,0.10)'
-  },
-  chatBubble: {
-    maxWidth: '75%',
-    padding: '13px 16px',
-    borderRadius: 14,
-    fontSize: 15.5,
-    lineHeight: 1.55,
-    wordBreak: 'break-all',
-    marginBottom: 2,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  questionBubble: {
-    alignSelf: 'flex-end',
-    background: '#e7f1ff',
-    color: '#1d3d68',
-  },
-  answerBubble: {
-    alignSelf: 'flex-start',
-    background: '#e9ffe7',
-    color: '#244e23',
-  },
-  bottomBar: {
-    width: '100%',
-    minHeight: 56,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '12px 12px 14px 12px',
-    background: '#fff',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    boxSizing: 'border-box',
-    flexShrink: 0,
-    position: 'relative'
-  },
-  micButton: {
-    width: 56,
-    height: 56,
-    borderRadius: '50%',
-    background: '#f33d2d',
-    border: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 7,
-    boxShadow: '0 2px 8px 0 rgba(30,30,30,0.08)',
-    cursor: 'pointer',
-    transition: 'box-shadow 0.3s'
-  },
-  micPulse: {
-    boxShadow: '0 0 0 8px #ffd83588, 0 2px 8px 0 rgba(30,30,30,0.13)'
-  },
-  stopRecBtn: {
-    flex: 'none',
-    width: 220,
-    height: 44,
-    fontWeight: 700,
-    borderRadius: 22,
-    border: 'none',
-    background: '#ffd835',
-    color: '#333',
-    fontSize: 17,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 8px 0 rgba(230,200,50,0.10)',
-    cursor: 'pointer',
-    marginRight: 7,
-    transition: 'background 0.3s'
-  },
-  waveAni: {
-    marginRight: 8
-  },
-  input: {
-    flex: 1,
-    height: 38,
-    border: '1.5px solid #e0e0e0',
-    borderRadius: 16,
-    padding: '0 12px',
-    fontSize: 15,
-    outline: 'none',
-    marginRight: 6,
-    background: '#fff'
-  },
-  sendButton: {
-    height: 38,
-    minWidth: 48,
-    fontWeight: 600,
-    border: 'none',
-    borderRadius: 13,
-    fontSize: 15,
-    cursor: 'pointer',
-    transition: 'background 0.2s, color 0.2s'
-  }
-};
