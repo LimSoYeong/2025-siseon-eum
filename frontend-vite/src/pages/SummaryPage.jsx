@@ -68,13 +68,17 @@ export default function SummaryPage() {
     }
   }, [apiUrl, summaryText]);
 
-  // 최초 진입시 summary 자동 재생
+  // 최초 진입시 summary 자동 재생 (StrictMode의 이중 마운트 대비: 1초 쿨다운)
   useEffect(() => {
     const isUserInteracted = window.sessionStorage.getItem("userInteracted");
-    if (summaryText && isUserInteracted === "true") {
-      playVoice();
-    }
-  }, [apiUrl, summaryText, playVoice]);
+    if (!summaryText || isUserInteracted !== "true") return;
+    const key = "summary_tts_once_at";
+    const last = Number(window.sessionStorage.getItem(key) || 0);
+    const now = Date.now();
+    if (now - last < 1000) return; // 1초 내 재호출 방지
+    window.sessionStorage.setItem(key, String(now));
+    playVoice();
+  }, [summaryText, playVoice]);
 
   // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
@@ -307,20 +311,20 @@ export default function SummaryPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#fff',
+    background: 'var(--bg-color)',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
   },
   container: {
-    width: 360,
-    height: 600,
-    maxWidth: '100vw',
-    margin: '0 auto',
+    width: '100%',
+    height: '100dvh',
+    maxWidth: '100%',
+    margin: 0,
     border: 'none',
-    borderRadius: 18,
-    background: '#fff',
+    borderRadius: 0,
+    background: 'var(--bg-color)',
     display: 'flex',
     flexDirection: 'column',
     boxSizing: 'border-box',
@@ -328,13 +332,15 @@ const styles = {
     overflow: 'hidden'
   },
   topBar: {
-    height: 44,
+    minHeight: 48,
     width: '100%',
     background: '#111',
     display: 'flex',
     alignItems: 'center',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
+    paddingTop: 'max(env(safe-area-inset-top), 8px)',
+    paddingBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 12,
     marginBottom: 0,
     justifyContent: 'flex-start',
     flexShrink: 0,
@@ -344,7 +350,7 @@ const styles = {
     border: 'none',
     color: '#fff',
     fontSize: 22,
-    marginLeft: 12,
+    marginLeft: 2,
     cursor: 'pointer',
     outline: 'none'
   },
@@ -358,8 +364,8 @@ const styles = {
   chatArea: {
     flex: 1,
     width: '100%',
-    padding: '18px 10px 18px 10px',
-    background: '#fff',
+    padding: '12px 10px 12px 10px',
+    background: 'var(--bg-color)',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
@@ -442,10 +448,10 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '12px 12px 14px 12px',
-    background: '#fff',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    padding: '10px 12px max(env(safe-area-inset-bottom), 12px) 12px',
+    background: 'var(--bg-color)',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     boxSizing: 'border-box',
     flexShrink: 0,
     position: 'relative'
@@ -497,7 +503,7 @@ const styles = {
     fontSize: 15,
     outline: 'none',
     marginRight: 6,
-    background: '#fff'
+    background: 'var(--bg-color)'
   },
   sendButton: {
     height: 38,
