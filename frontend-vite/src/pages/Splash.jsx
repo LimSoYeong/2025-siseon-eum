@@ -27,8 +27,8 @@ const styles = {
     minHeight: '80vh',
     margin: '40px auto',
     // border: '4px solid #eee',  // 회색 테두리
-    borderRadius: 18,
-    background: '#fff',
+    borderRadius: 0,
+    background: 'var(--bg-color)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -45,7 +45,7 @@ const styles = {
   },
   subtitle: {
     fontSize: 15,
-    color: '#666',
+    color: 'var(--font-color)',
     textAlign: 'center',
     marginBottom: 16
   }
