@@ -29,7 +29,7 @@ class ConversationSession:
         self.messages = [
             {"role": "user", "content": [{"type": "image", "image": self.image}]}
         ]
-        self.image_features = self._extract_cached_vision_inputs(self.image)
+        self.image_inputs = self._extract_cached_vision_inputs(self.image)
         self.last_response = None
 
     def _extract_cached_vision_inputs(self, image):
@@ -52,7 +52,7 @@ class ConversationSession:
         text = _get_processor().apply_chat_template(self.messages, tokenize=False, add_generation_prompt=True)
 
         # 텍스트 + 이미지 동시 토크나이즈 (이미지는 캐시된 image_inputs를 재사용)
-        inputs = _get_processor()(text=[text], images=self.image_features, return_tensors="pt").to(_get_model().device)
+        inputs = _get_processor()(text=[text], images=self.image_inputs, return_tensors="pt").to(_get_model().device)
 
         # 추론
         inference_start = time.time()
