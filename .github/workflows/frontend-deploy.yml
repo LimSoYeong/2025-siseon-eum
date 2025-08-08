@@ -42,14 +42,14 @@ jobs:
       - name: Deploy via rsync
         uses: easingthemes/ssh-deploy@v5.0.3
         with:
-          sshPrivateKey: ${{ secrets.SSH_PRIVATE_KEY }}
-          remoteHost: ${{ secrets.SSH_HOST }}
-          remoteUser: ${{ secrets.SSH_USER }}
-          remotePort: ${{ secrets.SSH_PORT || '22' }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          REMOTE_PORT: ${{ secrets.SSH_PORT || '22' }}
           # 워크스페이스 기준 경로
-          source: 'frontend-vite/dist/'
+          SOURCE: 'frontend-vite/dist/'
           # 예: /var/www/siseon-frontend 또는 Nginx 정적 루트
-          target: ${{ secrets.DEPLOY_PATH }}
-          args: '-az --delete'
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+          ARGS: '-az --delete'
 
 
