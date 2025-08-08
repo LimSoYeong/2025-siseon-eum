@@ -36,7 +36,7 @@ export default function HomeScreen() {
       <div style={styles.recentTitle}>최근 찍은 문서 보기</div>
       <div style={styles.docsWrap}>
         {docs.map((doc, i) => (
-          <div key={i} style={styles.docCard} onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId } })}>
+          <div key={i} style={styles.docCard} onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId, fromHome: true } })}>
             <div>
               <div style={styles.docDate}>{doc.date}</div>
               <div style={styles.docTitle}>{doc.title}</div>

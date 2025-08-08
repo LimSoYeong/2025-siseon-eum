@@ -8,6 +8,7 @@ export default function SummaryPage() {
   const apiUrl = import.meta.env.VITE_API_URL;
   const summaryText = location.state?.summary || '';
   const docId = location.state?.docId;
+  const fromHome = location.state?.fromHome;
   const audioRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -84,8 +85,12 @@ export default function SummaryPage() {
   // ----------- 뒤로가기(카메라) 이동 -----------
   const handleBack = () => {
     stopVoice();
-    // 카메라로 이동하면서 히스토리 정리: 뒤로가면 홈으로 가도록 카메라에서 replace 처리
-    navigate('/camera', { replace: true });
+    if (fromHome) {
+      navigate('/home', { replace: true });
+    } else {
+      // 촬영 직후 요약으로 진입한 경우
+      navigate('/camera', { replace: true });
+    }
   };
 
   // ----------- 마이크 (녹음 토글) -----------
