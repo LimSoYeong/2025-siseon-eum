@@ -1,3 +1,7 @@
+@import "tailwindcss";
+
+/* 프로젝트 전역 커스텀 스타일이 있다면 여기에 추가 */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
