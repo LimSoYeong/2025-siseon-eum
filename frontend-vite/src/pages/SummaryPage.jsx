@@ -19,6 +19,8 @@ export default function SummaryPage() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
   const [pulse, setPulse] = useState(false);
+  const [playingId, setPlayingId] = useState(null); // 어느 카드가 재생 중인지
+
 
   // 녹음 중 파동효과
   useEffect(() => {
@@ -40,31 +42,40 @@ export default function SummaryPage() {
       audioRef.current = null;
     }
     setIsPlaying(false);
+    setPlayingId(null); //재생 카드 초기화
   };
 
-  // TTS 재생
-  const playVoice = useCallback(async () => {
+  // TTS 재생 --> 텍스트/아이디 받기
+  const playVoice = useCallback(async (text, id) => {
     stopVoice();
-    if (!summaryText) return;
+    if (!text) return;
     try {
-      const response = await axios.post(
-        `${apiUrl}/api/tts`,
-        { text: summaryText },
-        { responseType: 'blob' }
-      );
-      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+      const res = await axios.post(`${apiUrl}/api/tts`, { text }, { responseType: 'blob' });
+      const audioBlob = new Blob([res.data], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
+  
       setIsPlaying(true);
-      audio.play().catch(() => setIsPlaying(false));
-      audio.addEventListener('ended', () => setIsPlaying(false));
-      audio.addEventListener('pause', () => setIsPlaying(false));
+      setPlayingId(id); // 🔹현재 카드 표시
+  
+      audio.play().catch(() => { setIsPlaying(false); setPlayingId(null); });
+  
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setPlayingId(null);
+        URL.revokeObjectURL(audioUrl);
+      });
+      audio.addEventListener('pause', () => {
+        setIsPlaying(false);
+        setPlayingId(null);
+      });
     } catch {
       setIsPlaying(false);
+      setPlayingId(null);
       alert('TTS 요청 실패');
     }
-  }, [apiUrl, summaryText]);
+  }, [apiUrl]);
 
   // 첫 진입 시 자동 1회 재생(사용자 인터랙션 이후)
   useEffect(() => {
@@ -75,7 +86,7 @@ export default function SummaryPage() {
     const now = Date.now();
     if (now - last < 1000) return;
     window.sessionStorage.setItem(key, String(now));
-    playVoice();
+    playVoice(summaryText, 0); // 첫 카드(요약)만 자동 재생
   }, [summaryText, playVoice]);
 
   // 뒤로가기
@@ -178,7 +189,7 @@ export default function SummaryPage() {
 
         {/* 메시지 영역 */}
         <div className="flex flex-col gap-4 p-3 flex-1 overflow-y-auto">
-          {chatList.map((msg, idx) =>
+          {chatList.map((msg, idx) => //카드별 버튼 렌더링 수정
             (msg.type === 'summary' || msg.type === 'answer') ? (
               <div
                 key={idx}
@@ -189,19 +200,19 @@ export default function SummaryPage() {
                 {/* 녹음 중엔 다시듣기/음성중지 버튼 감춤 */}
                 {!isRecording && (
                   <div className="mt-2">
-                    {!isPlaying ? (
-                      <button
-                        className="flex items-center gap-1 bg-green-500 text-white px-4 py-2 rounded shadow"
-                        onClick={playVoice}
-                      >
-                        <span className="text-lg">▶</span> 다시듣기
-                      </button>
-                    ) : (
+                    {isPlaying && playingId === idx ? (
                       <button
                         className="flex items-center gap-1 bg-orange-500 text-white px-4 py-2 rounded shadow"
                         onClick={stopVoice}
                       >
                         <span className="text-lg">■</span> 음성중지
+                      </button>
+                    ) : (
+                      <button
+                        className="flex items-center gap-1 bg-green-500 text-white px-4 py-2 rounded shadow"
+                        onClick={() => playVoice(msg.text, idx)}   // 🔹이 카드의 텍스트 재생
+                      >
+                        <span className="text-lg">▶</span> 다시듣기
                       </button>
                     )}
                   </div>
