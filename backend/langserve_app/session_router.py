@@ -54,8 +54,8 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
         httponly=True,
         # 로컬 개발: 서로 다른 호스트(127.0.0.1 vs localhost) 간에도 전송되도록 None
         # 배포 시 None/True로 전환
-        samesite="None"
-        secure=False,
+        samesite="None",
+        secure=True,
     )
     print("세션이 시작되었습니다.")
     return {"answer": initial_summary, "doc_id": doc_id}
