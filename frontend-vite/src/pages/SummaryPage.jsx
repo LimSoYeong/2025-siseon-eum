@@ -272,7 +272,7 @@ export default function SummaryPage() {
                     ? 'bg-black text-white cursor-pointer'
                     : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                 }`}
-                onClick={inputValue.trim().length ? () =>  handleSend : undefined}
+                onClick={inputValue.trim().length ? () =>  handleSend() : undefined}
                 disabled={!inputValue.trim().length}
               >
                 전송
