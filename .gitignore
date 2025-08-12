@@ -32,4 +32,6 @@ ssl
 node_modules
 node_modules/*
 backend/data/
-backend/faiss_db
+backend/faiss_dbai/qwen/.env
+ai/qwen/cached_embeds/
+ai/qwen/__pycache__/
