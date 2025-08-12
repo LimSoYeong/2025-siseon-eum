@@ -35,3 +35,6 @@ backend/data/
 backend/faiss_dbai/qwen/.env
 ai/qwen/cached_embeds/
 ai/qwen/__pycache__/
+
+.faiss
+.pkl
