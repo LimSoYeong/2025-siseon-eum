@@ -1,28 +1,37 @@
 import json
 import pandas as pd
-import math
+from json import JSONDecoder, JSONDecodeError
 
-# ====== 파일 경로 설정 ======
-input_path = "results_time_infer_only"  # JSONL 파일 경로
+# ====== 경로 ======
+input_path = "results_final.jsonl"
+output_path = "infer_time_results.xlsx"
 
-# ====== JSONL 파일 읽고 infer_time만 추출 ======
+# ====== JSON 안전 파싱 함수 ======
+def extract_json_objects(text: str):
+    decoder = JSONDecoder()
+    idx, n = 0, len(text)
+    while idx < n:
+        start_idx = text.find("{", idx)
+        if start_idx == -1:
+            break
+        try:
+            obj, end_idx = decoder.raw_decode(text, start_idx)
+            yield obj
+            idx = end_idx
+        except JSONDecodeError:
+            idx = start_idx + 1
+
+# ====== 파일 전체 읽어서 infer_time 추출 ======
 with open(input_path, "r", encoding="utf-8") as f:
-    records = [json.loads(line) for line in f]
+    content = f.read()
 
-# infer_time 리스트 추출
-infer_times = [record.get("infer_time") for record in records if "infer_time" in record]
+records = list(extract_json_objects(content))
+infer_times = [r.get("infer_time") for r in records if isinstance(r.get("infer_time"), (int, float))]
 
-chunk_size = 10
-num_chunks = math.ceil(len(infer_times) / chunk_size)
+# ====== 10개씩 끊어 열로 배치 ======
+cols = [infer_times[i:i+10] for i in range(0, len(infer_times), 10)]
+df = pd.DataFrame(cols).T  # 전치해서 10행 × N열
 
-# ====== 10개씩 분할 저장 ======
-for i in range(num_chunks):
-    start = i * chunk_size
-    end = start + chunk_size
-    chunk = infer_times[start:end]
-
-    df = pd.DataFrame({"infer_time": chunk})
-    output_path = f"infer_time_part_{i+1}.xlsx"
-    df.to_excel(output_path, index=False)
-
-    print(f"✅ 저장 완료: {output_path}")
+# ====== 저장 ======
+df.to_excel(output_path, index=False, header=False)
+print(f"✅ 저장 완료: {output_path} ({df.shape[0]}행 × {df.shape[1]}열)")
