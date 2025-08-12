@@ -272,7 +272,7 @@ export default function SummaryPage() {
                     ? 'bg-black text-white cursor-pointer'
                     : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                 }`}
-                onClick={inputValue.trim().length ? handleSend : undefined}
+                onClick={inputValue.trim().length ? () =>  handleSend : undefined}
                 disabled={!inputValue.trim().length}
               >
                 전송
@@ -284,6 +284,14 @@ export default function SummaryPage() {
 
       {/* 녹음 중 파동 애니메이션 점 */}
       <style>{`
+
+        .recording-btn {
+          animation: recordingBlink 1s infinite;
+        }
+        @keyframes recordingBlink {
+          0%, 100% { background-color: #ffeb3b; color: #000;}
+          50% { background-color: #ff3b30; color: #fff}
+        }
         .wave-ani {
           display: inline-block;
           width: 10px;
