@@ -165,6 +165,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import UIButton from '../components/common/UIButton';
 
 export default function HomeScreen() {
   const navigate = useNavigate();
@@ -220,13 +221,13 @@ export default function HomeScreen() {
       </div>
 
       <div className="fixed left-0 right-0 bottom-0 flex justify-center items-center py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] bg-[var(--bg-color)] shadow-[0_-2px_6px_rgba(0,0,0,0.04)]">
-        <button
+        <UIButton
           className="flex items-center gap-1 w-[calc(100%-40px)] h-[55px] text-[20px] font-medium border border-black rounded-[8px] bg-[var(--bg-color)] text-[var(--font-color)] cursor-pointer justify-center shadow-sm"
           onClick={handleStartCamera}
         >
           <span role="img" aria-label="camera" className="text-[25px] mr-[5px]">📷</span>
           문서 촬영
-        </button>
+        </UIButton>
       </div>
     </div>
   );

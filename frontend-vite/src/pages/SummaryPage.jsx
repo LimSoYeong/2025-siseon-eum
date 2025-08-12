@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Mic } from 'lucide-react';
+import UIButton from '../components/common/UIButton';
 
 export default function SummaryPage() {
   const location = useLocation();
@@ -183,7 +184,7 @@ export default function SummaryPage() {
       <div className="flex flex-col h-[100dvh] overflow-hidden">
         {/* 상단 바 */}
         <div className="flex items-center p-3 bg-black text-white text-base font-medium">
-          <button className="mr-2 text-xl" onClick={handleBack}>&larr;</button>
+          <UIButton className="mr-2 text-xl" onClick={handleBack}>&larr;</UIButton>
           <span>다시 찍기</span>
         </div>
 
@@ -201,19 +202,19 @@ export default function SummaryPage() {
                 {!isRecording && (
                   <div className="mt-2">
                     {isPlaying && playingId === idx ? (
-                      <button
+                      <UIButton
                         className="flex items-center gap-1 bg-orange-500 text-white px-4 py-2 rounded shadow"
                         onClick={stopVoice}
                       >
                         <span className="text-lg">■</span> 음성중지
-                      </button>
+                      </UIButton>
                     ) : (
-                      <button
+                      <UIButton
                         className="flex items-center gap-1 bg-green-500 text-white px-4 py-2 rounded shadow"
-                        onClick={() => playVoice(msg.text, idx)}   // 🔹이 카드의 텍스트 재생
+                        onClick={() => playVoice(msg.text, idx)}
                       >
                         <span className="text-lg">▶</span> 다시듣기
-                      </button>
+                      </UIButton>
                     )}
                   </div>
                 )}
@@ -238,7 +239,7 @@ export default function SummaryPage() {
         <div className="flex items-center gap-2 px-3 py-2">
           {/* 빨간 음성 버튼 ↔ 질문 끝내기 단일 버튼 */}
           {!isRecording ? (
-            <button
+            <UIButton
               className={`w-14 h-14 rounded-full flex items-center justify-center shadow ${
                 pulse ? 'shadow-[0_0_0_8px_#ffd83588]' : ''
               } bg-red-600`}
@@ -246,14 +247,18 @@ export default function SummaryPage() {
               title="음성 녹음"
             >
               <Mic color="white" size={28} />
-            </button>
+            </UIButton>
           ) : (
-            <button
+            <UIButton
               className="flex-1 h-11 flex items-center justify-center bg-yellow-300 rounded-full font-bold text-[17px] text-zinc-800 shadow"
               onClick={handleStopRecording}
             >
-              <span className="wave-ani mr-2" /> 질문 끝내기
-            </button>
+              <span className="relative mr-2 inline-flex h-2.5 w-2.5 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-75 animate-ping"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400"></span>
+              </span>
+              질문 끝내기
+            </UIButton>
           )}
 
           {/* 녹음 중엔 입력창/전송 버튼 완전히 제거 */}
@@ -266,7 +271,7 @@ export default function SummaryPage() {
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => isSendActive && e.key === 'Enter' && handleSend()}
               />
-              <button
+              <UIButton
                 className={`h-10 min-w-[48px] rounded-[13px] font-semibold text-[15px] ${
                   inputValue.trim().length
                     ? 'bg-black text-white cursor-pointer'
@@ -276,38 +281,13 @@ export default function SummaryPage() {
                 disabled={!inputValue.trim().length}
               >
                 전송
-              </button>
+              </UIButton>
             </>
           )}
         </div>
       </div>
 
-      {/* 녹음 중 파동 애니메이션 점 */}
-      <style>{`
-
-        .recording-btn {
-          animation: recordingBlink 1s infinite;
-        }
-        @keyframes recordingBlink {
-          0%, 100% { background-color: #ffeb3b; color: #000;}
-          50% { background-color: #ff3b30; color: #fff}
-        }
-        .wave-ani {
-          display: inline-block;
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          background: #fff176;
-          margin-right: 8px;
-          box-shadow: 0 0 0 0 #fff176;
-          animation: wavePulse 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        @keyframes wavePulse {
-          0% { box-shadow: 0 0 0 0 #fff176; opacity: 1; }
-          70% { box-shadow: 0 0 0 10px rgba(255, 241, 118, 0.5); opacity: 0.7; }
-          100% { box-shadow: 0 0 0 0 #fff176; opacity: 0.2; }
-        }
-      `}</style>
+      
     </div>
   );
 }

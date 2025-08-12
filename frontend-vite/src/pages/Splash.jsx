@@ -53,6 +53,7 @@
 
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import UIButton from '../components/common/UIButton';
 
 export default function Splash() {
   const navigate = useNavigate();
