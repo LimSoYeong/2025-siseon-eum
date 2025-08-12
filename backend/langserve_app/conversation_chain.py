@@ -9,3 +9,9 @@ class ImageChatRunnable(Runnable):
 
     def invoke(self, input_text: str) -> str:
         return self.session.ask(input_text)
+
+    def classify(self) -> str:
+        return self.session.classify_document()
+
+    def prompt_for(self, doc_type: str) -> str:
+        return self.session.get_prompt_for_type(doc_type)

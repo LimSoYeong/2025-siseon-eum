@@ -3,19 +3,14 @@
 from fastapi import APIRouter, UploadFile, Response, Request, Cookie
 import uuid, shutil
 from .conversation_chain import ImageChatRunnable
-from infrastructure.vector_store import (
-    save_image_embedding,
-    save_text_embedding,
-    search_by_text,
-    list_recent_docs,
-)
 import os
 import time
 from data_store.conversations import append_message, get_conversation
-from PIL import Image
+from data_store.recent_docs import add_recent_doc, list_recent_docs
 
 router = APIRouter(prefix="/api")
 sessions = {}
+latest_doc_id_by_user: dict[str, str] = {}
 
 @router.post("/start_session")
 async def start_session(image: UploadFile, response: Response, user_id: str = Cookie(None)):
@@ -29,22 +24,33 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
     with open(temp_path, "wb") as f:
         shutil.copyfileobj(image.file, f)
     sessions[user_id] = ImageChatRunnable(temp_path) # 세션 초기화
-    # 벡터 DB에 이미지 임베딩 저장
+    latest_doc_id_by_user[user_id] = doc_id
+    # 문서 유형 분류 및 유형별 프롬프트 선택
     try:
-        save_image_embedding(temp_path, user_id=user_id, extra_metadata={"source": "start_session", "doc_id": doc_id})
+        doc_type = sessions[user_id].classify()
+        doc_type = "기타"
+        prompt_text = sessions[user_id].prompt_for(doc_type)
+        # 분류 로그 (pm2 stdout 수집)
+        print(f"📝 문서유형: {doc_type}")
     except Exception as e:
-        print(f"[WARN] save_image_embedding 실패: {e}")
-    initial_summary = sessions[user_id].invoke("이 문서에 대해 설명해줘.")
+        print(f"[WARN] 문서 유형 분류 실패: user_id={user_id} doc_id={doc_id} error={e}")
+        doc_type = "기타"
+        prompt_text = sessions[user_id].prompt_for(doc_type)
+    # 유형별 프롬프트로 초기 요약 생성
+    initial_summary = sessions[user_id].invoke(prompt_text)
     append_message(user_id, doc_id, "assistant", initial_summary)
-    # 요약 텍스트도 벡터DB에 저장
+    # 최근 문서 기록 저장 (RAG 비활성화 대체)
     try:
-        # 길면 CLIP 한도를 넘기므로 요약을 200자로 우선 절단
-        safe_summary = (initial_summary or "").strip()
-        if len(safe_summary) > 200:
-            safe_summary = safe_summary[:200] + "…"
-        save_text_embedding(safe_summary, user_id=user_id, extra_metadata={"source": "summary", "doc_id": doc_id})
+        add_recent_doc(
+            user_id=user_id,
+            doc_id=doc_id,
+            path=temp_path,
+            title=initial_summary[:60] if initial_summary else "문서",
+            doc_type=doc_type,
+        )
     except Exception as e:
-        print(f"[WARN] save_text_embedding 실패: {e}")
+        print(f"[WARN] add_recent_doc 실패: {e}")
+    # (RAG 제거) 임베딩 저장 로직 제거
 
     # 쿠키로 user_id 저장 (7일 유효). 이미 있더라도 갱신만 수행
     response.set_cookie(
@@ -58,86 +64,39 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
         secure=True,
     )
     print("세션이 시작되었습니다.")
-    return {"answer": initial_summary, "doc_id": doc_id}
+    return {"answer": initial_summary, "doc_id": doc_id, "doc_type": doc_type}
 
 @router.post("/save_text")
 async def save_text(request: Request, user_id: str = Cookie(None)):
-    body = await request.json()
-    text = body.get("text")
-    if not text:
-        return {"error": "text가 비어 있습니다."}
-    if not user_id:
-        # 익명 저장 허용. 쿠키 없을 때는 임시 id 생성
-        user_id = uuid.uuid4().hex
-    try:
-        save_text_embedding(text, user_id=user_id, extra_metadata={"source": "manual"})
-        return {"status": "ok"}
-    except Exception as e:
-        return {"error": str(e)}
+    # (RAG 제거) 텍스트 임베딩 저장 기능 비활성화
+    return {"status": "disabled"}
 
 @router.post("/ask")
 async def ask_question(request: Request, user_id: str = Cookie(None)):
     body = await request.json()
     question = body.get("question")
+    doc_id = body.get("doc_id") or latest_doc_id_by_user.get(user_id)
 
     if user_id not in sessions:
         return {"error": "세션이 존재하지 않습니다. 먼저 /start_session 호출하세요."}
 
-    # 1) 질문을 벡터DB에 저장 (사용자 스코프)
+    if not doc_id:
+        return {"error": "대화 문서 식별자(doc_id)가 없습니다. 먼저 /start_session을 호출하세요."}
+
+    # 질문/답변 대화 기록 저장 + 이미지+질문으로 직접 모델 호출
     try:
-        save_text_embedding(question, user_id=user_id, extra_metadata={"source": "qa_question"})
+        append_message(user_id, doc_id, "user", question)
     except Exception as e:
-        print(f"[WARN] save_text_embedding(question) 실패: {e}")
+        print(f"[WARN] append_message(question) 실패: user_id={user_id} doc_id={doc_id} error={e}")
 
-    # 2) 유사도 검색 후 컨텍스트 구성 (user_id 필터)
+    response_text = sessions[user_id].invoke(question)
+
     try:
-        raw_results = search_by_text(question, k=20) or []
-        filtered = [r for r in raw_results if r.get("metadata", {}).get("user_id") == user_id]
-        topk = filtered[:5]
-        context_lines = []
-        for item in topk:
-            meta = item.get("metadata", {})
-            item_type = meta.get("type")
-            if item_type == "text":
-                text = item.get("text", "")
-                if len(text) > 160:
-                    text = text[:160] + "…"
-                context_lines.append(f"- 이전 텍스트: {text}")
-            elif item_type == "image":
-                path = meta.get("path")
-                basename = os.path.basename(path) if path else "(path 미상)"
-                context_lines.append(f"- 이전 이미지: {basename}")
-        context_block = (
-            "이전 관련 정보(사용자 개인 히스토리)입니다. 필요 시 연결감을 유지해 답변하세요:\n"
-            + "\n".join(context_lines)
-            if context_lines
-            else ""
-        )
+        append_message(user_id, doc_id, "assistant", response_text)
     except Exception as e:
-        print(f"[WARN] search_by_text 실패: {e}")
-        context_block = ""
+        print(f"[WARN] append_message(answer) 실패: user_id={user_id} doc_id={doc_id} error={e}")
 
-    # 3) 컨텍스트를 주입한 질문 생성
-    if context_block:
-        combined_question = f"{context_block}\n\n질문: {question}"
-    else:
-        combined_question = question
-
-    # 4) 모델 호출
-    response = sessions[user_id].invoke(combined_question)
-
-    # 5) 답변/요약 스니펫 저장
-    try:
-        save_text_embedding(response, user_id=user_id, extra_metadata={"source": "qa_answer"})
-        snippet = response.strip()
-        if len(snippet) > 160:
-            snippet = snippet[:160] + "…"
-        if snippet:
-            save_text_embedding(snippet, user_id=user_id, extra_metadata={"source": "summary_snippet"})
-    except Exception as e:
-        print(f"[WARN] save_text_embedding(answer/snippet) 실패: {e}")
-
-    return {"answer": response}
+    return {"answer": response_text, "doc_id": doc_id}
 
 @router.get("/conversation")
 async def conversation(user_id: str = Cookie(None), doc_id: str | None = None):
@@ -151,7 +110,6 @@ async def recent_docs(user_id: str = Cookie(None)):
         return {"items": []}
     try:
         items = list_recent_docs(user_id=user_id, limit=20)
-        # 썸네일을 위한 파일 경로를 그대로 반환 (프런트가 file://가 아닌 서버 경로로 접근해야 하므로 아래 서빙 라우트도 제공)
         return {"items": items}
     except Exception as e:
         return {"items": [], "error": str(e)}
