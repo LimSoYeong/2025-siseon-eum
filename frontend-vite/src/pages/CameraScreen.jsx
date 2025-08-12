@@ -105,6 +105,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import UIButton from '../components/common/UIButton';
 
 export default function CameraScreen() {
   const videoRef = useRef(null);
@@ -159,15 +160,15 @@ export default function CameraScreen() {
       <canvas ref={canvasRef} width="360" height="640" className="hidden" />
 
       {/* ← 뒤로가기 버튼 */}
-      <button
+      <UIButton
         onClick={goBack}
         className="absolute top-5 left-5 px-4 py-2 text-white text-base rounded-md z-10 bg-black/40"
       >
         ← 뒤로가기
-      </button>
+      </UIButton>
 
       {/* ● 촬영 버튼 */}
-      <button
+      <UIButton
         onClick={takePhoto}
         className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-[90px] h-[90px] rounded-full bg-white border-[4px] border-gray-300 z-10"
       />

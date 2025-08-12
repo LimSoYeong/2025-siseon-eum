@@ -97,6 +97,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import UIButton from '../components/common/UIButton';
 
 export default function LoadingPage() {
   const navigate = useNavigate();
