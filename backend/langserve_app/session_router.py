@@ -6,7 +6,7 @@ from .conversation_chain import ImageChatRunnable
 import os
 import time
 from data_store.conversations import append_message, get_conversation
-from data_store.recent_docs import add_recent_doc, list_recent_docs
+from data_store.recent_docs import add_recent_doc, list_recent_docs, delete_recent_doc
 
 router = APIRouter(prefix="/api")
 sessions = {}
@@ -121,3 +121,16 @@ async def serve_image(path: str):
     if not path or not os.path.exists(path):
         return {"error": "이미지를 찾을 수 없습니다."}
     return FileResponse(path)
+
+@router.post("/delete_doc")
+async def delete_doc(request: Request, user_id: str = Cookie(None)):
+    if not user_id:
+        return {"removed": False, "error": "no user"}
+    body = await request.json()
+    doc_id = body.get("doc_id")
+    path = body.get("path")
+    try:
+        result = delete_recent_doc(user_id=user_id, doc_id=doc_id, path=path)
+        return result
+    except Exception as e:
+        return {"removed": False, "error": str(e)}
