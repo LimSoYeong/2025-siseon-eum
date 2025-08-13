@@ -1,9 +1,9 @@
-import time, json, gc
-from pathlib import Path
-from PIL import Image
-import torch
-
+import torch, gc
 from model_loader import get_model, get_processor
+from PIL import Image
+import time, json
+from pathlib import Path
+
 
 # ===== 경로 설정 =====
 base_dir = Path(__file__).resolve().parent.parent
@@ -141,140 +141,72 @@ WARMUP = 0
 # VRAM 여유가 크면 True로 두 모델 동시 로드(빠름), 부족하면 False로 매번 교체 로드(안정)
 HOLD_BOTH_MODELS = False
 
+for img_path in image_files:
+    try:
+        # 파일 핸들 즉시 해제되도록 with 사용
+        with Image.open(img_path) as im:
+            image = im.convert("RGB")
+    except Exception as e:
+        print(f"이미지 열기 실패: {img_path} - {e}")
+        continue
 
-# ===== 유틸 =====
-def save_jsonl(record):
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-def clear_model_cache():
-    get_model.cache_clear()
-    gc.collect()
-    torch.cuda.empty_cache()
-    torch.cuda.synchronize()
-
-def classify_document(image, model, processor):
-    messages = [
-        {"role": "user", "content": [
-            {"type": "image", "image": image},
-            {"type": "text", "text": DOC_TYPE_PROMPT}
-        ]}
-    ]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = processor(text=[text], images=[image], return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        torch.cuda.synchronize(); t0 = time.perf_counter()
-        out_ids = model.generate(**inputs, max_new_tokens=16)
-        torch.cuda.synchronize(); t1 = time.perf_counter()
-    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, out_ids)]
-    result = processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
-    return result, (t1 - t0)
-
-def summarize_document(image, prompt_text, model, processor, max_new_tokens=256):
-    messages = [
-        {"role": "user", "content": [
-            {"type": "image", "image": image},
-            {"type": "text", "text": prompt_text}
-        ]}
-    ]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = processor(text=[text], images=[image], return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        torch.cuda.synchronize(); t0 = time.perf_counter()
-        out_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
-        torch.cuda.synchronize(); t1 = time.perf_counter()
-    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, out_ids)]
-    output = processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
-    return output, (t1 - t0)
-
-# ===== 메인 =====
-if __name__ == "__main__":
-    if not image_files:
-        raise SystemExit("이미지 폴더가 비어있어요: data/img/*.jpg|*.png")
-
-    processor = get_processor()
-    print(f"총 {len(image_files)}장 처리 시작 (분류=Flash ON, 요약=SDPA)")
-
-    # 선택 1) 두 모델 동시 로드
-    model_cls = model_sum = None
+    # ----- 분류 (Flash ON 우선) -----
     if HOLD_BOTH_MODELS:
+        m_cls = model_cls
+    else:
+        clear_model_cache()
         try:
-            model_cls = get_model(attn_impl="flash_attention_2").eval()
+            m_cls = get_model(attn_impl="flash_attention_2").eval()
         except Exception as e:
             print(f"⚠️ FlashAttention 분류 모델 로드 실패: {e}\n→ sdpa로 대체")
-            model_cls = get_model(attn_impl="sdpa").eval()
+            m_cls = get_model(attn_impl="sdpa").eval()
+
+    doc_type, t_cls = classify_document(image, m_cls, processor)
+    prompt_text = PROMPT_MAP.get(doc_type, ELSE_PROMPT)
+
+    # 분류 모델 즉시 해제(메모리 회수) — cpu() 내리지 않음
+    if not HOLD_BOTH_MODELS:
         try:
-            model_sum = get_model(attn_impl="sdpa").eval()
-        except Exception as e:
-            print(f"❌ SDPA 요약 모델 로드 실패: {e}")
-            raise
+            del m_cls
+        except Exception:
+            pass
+        get_model.cache_clear()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
-    # 워밍업(선택)
-    if WARMUP > 0 and image_files:
-        img0 = Image.open(image_files[0]).convert("RGB")
-        if HOLD_BOTH_MODELS:
-            _ = classify_document(img0, model_cls, processor)
-            _ = summarize_document(img0, ELSE_PROMPT, model_sum, processor, MAX_NEW_TOKENS)
-        else:
-            # 분류용 로드
-            clear_model_cache()
-            try:
-                model = get_model(attn_impl="flash_attention_2").eval()
-            except Exception:
-                model = get_model(attn_impl="sdpa").eval()
-            _ = classify_document(img0, model, processor)
-            # 요약용 로드
-            clear_model_cache()
-            model = get_model(attn_impl="sdpa").eval()
-            _ = summarize_document(img0, ELSE_PROMPT, model, processor, MAX_NEW_TOKENS)
+    # ----- 요약 (SDPA) -----
+    if HOLD_BOTH_MODELS:
+        m_sum = model_sum
+    else:
+        clear_model_cache()
+        m_sum = get_model(attn_impl="sdpa").eval()
 
-    # 본 처리: 이미지별로 (분류→요약) 순서 수행
-    for img_path in image_files:
+    output, t_sum = summarize_document(image, prompt_text, m_sum, processor, MAX_NEW_TOKENS)
+
+    if not HOLD_BOTH_MODELS:
         try:
-            image = Image.open(img_path).convert("RGB")
-        except Exception as e:
-            print(f"이미지 열기 실패: {img_path} - {e}")
-            continue
+            del m_sum
+        except Exception:
+            pass
+        get_model.cache_clear()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
-        # ----- 분류 (Flash ON 우선) -----
-        if HOLD_BOTH_MODELS:
-            m_cls = model_cls
-        else:
-            clear_model_cache()
-            try:
-                m_cls = get_model(attn_impl="flash_attention_2").eval()
-            except Exception as e:
-                print(f"⚠️ FlashAttention 분류 모델 로드 실패: {e}\n→ sdpa로 대체")
-                m_cls = get_model(attn_impl="sdpa").eval()
-
-        doc_type, t_cls = classify_document(image, m_cls, processor)
-        prompt_text = PROMPT_MAP.get(doc_type, ELSE_PROMPT)
-
-        # ----- 요약 (SDPA) -----
-        if HOLD_BOTH_MODELS:
-            m_sum = model_sum
-        else:
-            clear_model_cache()
-            m_sum = get_model(attn_impl="sdpa").eval()
-
-        output, t_sum = summarize_document(image, prompt_text, m_sum, processor, MAX_NEW_TOKENS)
-
-        total_s = round(t_cls + t_sum, 4)
-        rec = {
-            "mode": "Hybrid-Sequential(FlashON-CLS,SDPA-SUM)",
-            "image": img_path.name,
-            "doc_type": doc_type,
-            "output": output,
-            "classify_s": round(t_cls, 4),
-            "summary_s": round(t_sum, 4),
-            "total_s": total_s,
-            "attn_impl_cls": getattr(m_cls.config, "_attn_implementation", "unknown"),
-            "attn_impl_sum": getattr(m_sum.config, "_attn_implementation", "unknown") if HOLD_BOTH_MODELS else "sdpa",
-            "max_new_tokens": MAX_NEW_TOKENS,
-        }
-        save_jsonl(rec)
-        print(f"🖼️ {img_path.name} | {doc_type} | cls {rec['classify_s']}s / sum {rec['summary_s']}s / total {total_s}s")
-        print(f"→ 요약: {output}\n")
-
-    print(f"\n✅ 완료. 결과 저장: {out_path}")
+    total_s = round(t_cls + t_sum, 4)
+    rec = {
+        "mode": "Hybrid-Sequential(FlashON-CLS,SDPA-SUM)",
+        "image": img_path.name,
+        "doc_type": doc_type,
+        "output": output,
+        "classify_s": round(t_cls, 4),
+        "summary_s": round(t_sum, 4),
+        "total_s": total_s,
+        "attn_impl_cls": "flash_attention_2" if HOLD_BOTH_MODELS or "flash_attn" in rec.get("mode","").lower() else "flash_attention_2",
+        "attn_impl_sum": "sdpa",
+        "max_new_tokens": MAX_NEW_TOKENS,
+    }
+    save_jsonl(rec)
+    print(f"🖼️ {img_path.name} | {doc_type} | cls {rec['classify_s']}s / sum {rec['summary_s']}s / total {total_s}s")
+    print(f"→ 요약: {output}\n")
