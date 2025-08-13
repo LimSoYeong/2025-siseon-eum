@@ -58,3 +58,15 @@ def list_recent_docs(user_id: str, limit: int = 20):
         return result
     finally:
         db.close()
+
+# 삭제 (파일 삭제는 하지 않고 DB 레코드만 제거)
+def delete_recent_doc(user_id: str, doc_id: str, path: str | None = None):
+    db = SessionLocal()
+    removed = False
+    try:
+        q = db.query(RecentDoc).filter_by(user_id=user_id, doc_id=doc_id)
+        removed = q.delete(synchronize_session=False) > 0
+        db.commit()
+    finally:
+        db.close()
+    return {"removed": removed, "file_removed": False}
