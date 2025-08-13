@@ -6,6 +6,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Typing dots animation for pending question bubble */
+@keyframes typing-dot {
+  0%, 20% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.35; transform: scale(0.85); }
+}
+
+.typing-dots { display: inline-flex; align-items: center; gap: 6px; }
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: typing-dot 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.30s; }
+
 @keyframes fade-slide {
   0% { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
