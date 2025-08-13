@@ -1,4 +1,4 @@
-
+// LoadingPage.js
 
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -63,10 +63,10 @@ export default function LoadingPage() {
   }, [apiUrl, navigate, imageBlob]);
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-white dark:bg-black">
+    <div className="min-h-screen flex flex-col justify-center items-center bg-white">
       <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-800 rounded-full animate-spin mb-5"></div>
-      <div className="text-lg font-bold mb-2">잠시만 기다려주세요</div>
-      <div className="text-base">문서 분석중...</div>
+      <div className="text-lg font-bold mb-2 text-black">잠시만 기다려주세요</div>
+      <div className="text-base text-black">문서 분석중...</div>
     </div>
   );
 }

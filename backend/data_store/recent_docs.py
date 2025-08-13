@@ -72,3 +72,45 @@ def list_recent_docs(user_id: str, limit: int = 20) -> List[Dict]:
         return []
 
 
+def delete_recent_doc(user_id: str, doc_id: Optional[str] = None, *, path: Optional[str] = None, remove_file: bool = True) -> Dict:
+    """최근 문서에서 항목을 삭제하고(선택적으로) 원본 파일도 제거합니다.
+    - 기본은 doc_id 기준으로 삭제
+    - doc_id가 없거나 못 찾으면 path 기준으로도 시도
+    반환: {"removed": True/False, "path": 삭제된 파일 경로(있다면)}
+    """
+    fp = _file_path(user_id)
+    if not os.path.exists(fp):
+        return {"removed": False}
+    try:
+        with open(fp, "r", encoding="utf-8") as f:
+            records = json.load(f)
+    except Exception:
+        records = []
+    path = None
+    kept = []
+    removed = False
+    for r in records:
+        if doc_id and r.get("doc_id") == doc_id:
+            removed = True
+            path = r.get("path")
+            continue
+        kept.append(r)
+    # doc_id로 못 지웠고, path가 주어진 경우 path 기준 재시도
+    if not removed and path:
+        kept2 = []
+        for r in kept:
+            if r.get("path") == path:
+                removed = True
+                path = r.get("path")
+                continue
+            kept2.append(r)
+        kept = kept2
+    with open(fp, "w", encoding="utf-8") as f:
+        json.dump(kept, f, ensure_ascii=False)
+    if remove_file and path and os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+    return {"removed": removed, "path": path}
+

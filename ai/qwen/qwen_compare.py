@@ -1,26 +1,22 @@
-import sys
-import time
-import json
-import torch
+import time, json, gc
 from pathlib import Path
 from PIL import Image
+import torch
 
 from model_loader import get_model, get_processor
 
 # ====== 경로 설정 ======
 base_dir = Path(__file__).resolve().parent.parent
-result_path = base_dir / "qwen" / "results_selected_prompts.jsonl"
+out_path = base_dir / "qwen" / "results_time_compare.jsonl"
 image_dir = base_dir / "data" / "img"
-image_files = sorted(image_dir.glob("*.jpg"))  # 또는 *.png 등
+image_files = sorted(list(image_dir.glob("*.jpg")) + list(image_dir.glob("*.png")))
 
 # ====== 저장 함수 ======
-def save_result_jsonl(output, infer_time, path=result_path):
-    record = {
-        "output": output.strip(),
-        "infer_time": round(infer_time, 2)
-    }
+def save_result_jsonl(record, path=out_path):
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
 
 # ====== 분류용 프롬프트 ======
 DOC_TYPE_PROMPT = """
@@ -139,12 +135,18 @@ ELSE_PROMPT = """
     """
 
 
-# ====== 모델 불러오기 ======
-model = get_model().eval()
-processor = get_processor()
-print(f"✅ 모델 로드 완료 (디바이스: {model.device})")
+PROMPT_MAP = {
+    "고지서": A_PROMPT,
+    "안내문-건강": HEALTH_PROMPT,
+    "안내문-생활": LIFE_PROMPT,
+    "안내문-금융": FINANCE_PROMPT,
+    "기타": ELSE_PROMPT,
+}
 
-# ====== 문서 유형 분류 함수 ======
+MAX_NEW_TOKENS = 512
+WARMUP = 1
+
+# ====== 분류 함수 ======
 def classify_document(image, model, processor):
     messages = [
         {"role": "user", "content": [
@@ -154,44 +156,18 @@ def classify_document(image, model, processor):
     ]
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = processor(text=[text], images=[image], return_tensors="pt").to(model.device)
-
     with torch.no_grad():
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
         generated_ids = model.generate(**inputs, max_new_tokens=16)
-        trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
-        result = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0]
-    return result.strip()
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
+    trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
+    result = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0].strip()
+    return result, (t1 - t0)
 
-# ====== 메인 루프 ======
-for img_path in image_files:
-    image_id = img_path.stem
-    try:
-        image = Image.open(img_path).convert("RGB")
-    except Exception as e:
-        print(f"⚠️ 이미지 열기 실패: {img_path} - {e}")
-        continue
-
-    print(f"\n🖼️ [{image_id}] 이미지 처리 중...")
-
-    # 1. 문서 유형 분류
-    doc_type = classify_document(image, model, processor)
-    print(f"🔍 문서 유형: {doc_type}")
-
-    # 2. 프롬프트 선택 (변수로 직접 할당)
-    if doc_type == "고지서":
-        prompt_text = A_PROMPT
-    elif doc_type == "안내문-건강":
-        prompt_text = HEALTH_PROMPT
-    elif doc_type == "안내문-생활":
-        prompt_text = LIFE_PROMPT
-    elif doc_type == "안내문-금융":
-        prompt_text = FINANCE_PROMPT
-    elif doc_type == "기타":
-        prompt_text = ELSE_PROMPT
-    else:
-        print(f"⚠️ 알 수 없는 유형: {doc_type}")
-        continue
-
-    # 3. 요약용 메시지 구성
+# ====== 요약 함수 ======
+def summarize_document(image, prompt_text, model, processor):
     messages = [
         {"role": "user", "content": [
             {"type": "image", "image": image},
@@ -200,16 +176,85 @@ for img_path in image_files:
     ]
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = processor(text=[text], images=[image], return_tensors="pt").to(model.device)
-
-    # 4. 추론
     with torch.no_grad():
-        start = time.time()
-        generated_ids = model.generate(**inputs, max_new_tokens=512)
-        end = time.time()
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        generated_ids = model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
+    trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
+    output = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0].strip()
+    return output, (t1 - t0)
 
-        trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
-        output = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0]
+# ====== 한 번의 패스 실행 ======
+def run_pass(attn_impl: str, label: str):
+    get_model.cache_clear()
+    gc.collect(); torch.cuda.empty_cache()
+    try:
+        model = get_model(attn_impl=attn_impl).eval()
+    except Exception as e:
+        print(f"❌ [{label}] 모델 로드 실패: {e}")
+        return
+    processor = get_processor()
+    print(f"\n=== [{label}] 시작 (attn_impl={attn_impl}, device={model.device}) ===")
 
-    infer_time = end - start
-    print(f"📝 [{image_id}] 요약 완료 ({infer_time:.2f}s)\n→ {output.strip()}")
-    save_result_jsonl(output, infer_time)
+    # 워밍업
+    if image_files and WARMUP > 0:
+        img0 = Image.open(image_files[0]).convert("RGB")
+        _ = classify_document(img0, model, processor)
+        _ = summarize_document(img0, ELSE_PROMPT, model, processor)
+
+    # 본 실행
+    for img_path in image_files:
+        image_id = img_path.stem
+        try:
+            image = Image.open(img_path).convert("RGB")
+        except Exception as e:
+            print(f"⚠️ 이미지 열기 실패: {e}")
+            continue
+
+        doc_type, t_cls = classify_document(image, model, processor)
+        prompt_text = PROMPT_MAP.get(doc_type, ELSE_PROMPT)
+        output, t_sum = summarize_document(image, prompt_text, model, processor)
+
+        total_time = round(t_cls + t_sum, 4)
+        print(f"🖼️ {img_path.name} | 유형:{doc_type} | 총 {total_time}s")
+        print(f"→ 요약: {output}\n")
+
+        record = {
+            "mode": label,
+            "attn_impl": attn_impl,
+            "image": img_path.name,
+            "doc_type": doc_type,
+            "output": output,
+            "classify_s": round(t_cls, 4),
+            "summary_s": round(t_sum, 4),
+            "total_s": total_time
+        }
+        save_result_jsonl(record)
+
+# ====== 평균 시간 요약 ======
+def summarize_overall():
+    if not out_path.exists():
+        return
+    rows = [json.loads(l) for l in out_path.read_text(encoding="utf-8").splitlines()]
+    by_mode = {}
+    for r in rows:
+        by_mode.setdefault(r["mode"], []).append(r)
+    print("\n=== 모드별 평균 시간 ===")
+    for mode, items in by_mode.items():
+        avg_cls = sum(x["classify_s"] for x in items) / len(items)
+        avg_sum = sum(x["summary_s"] for x in items) / len(items)
+        avg_total = sum(x["total_s"] for x in items) / len(items)
+        print(f"{mode:<12} 분류 {avg_cls:.3f}s | 요약 {avg_sum:.3f}s | 총 {avg_total:.3f}s (n={len(items)})")
+
+# ====== 실행 ======
+if __name__ == "__main__":
+    if not image_files:
+        raise SystemExit("이미지가 없습니다.")
+
+    run_pass("sdpa", "Flash OFF")              # Flash OFF
+    run_pass("flash_attention_2", "Flash ON")  # Flash ON (설치 필요)
+
+    summarize_overall()
+    print(f"\n✅ 결과 저장 위치: {out_path}")
