@@ -114,7 +114,8 @@ export default function LoadingPage() {
 
       // FormData 구성 (❗ Content-Type 헤더 수동 지정 금지)
       const fd = new FormData();
-      fd.append('file', file, file.name); // 백엔드가 'image' 키면 여기만 'image'로 변경
+      // 백엔드 요구 파라미터명은 'image' (UploadFile 필드명)
+      fd.append('image', file, file.name);
 
       try {
         const res = await fetch(`${API_BASE}/api/start_session`, {
