@@ -424,13 +424,36 @@ export default function CameraScreen() {
     }
   }, []);
 
+  const stopCamera = useCallback(() => {
+    try {
+      streamRef.current?.getTracks()?.forEach((t) => t.stop());
+    } catch {}
+    streamRef.current = null;
+    trackRef.current = null;
+    imageCaptureRef.current = null;
+  }, []);
+
   // 시작/정리
   useEffect(() => {
     startCamera();
-    return () => {
-      streamRef.current?.getTracks()?.forEach((t) => t.stop());
+    // 페이지 이탈/언로드 시 카메라 정리
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopCamera();
+      } else if (!streamRef.current) {
+        // 다시 보이면 필요 시 재시작
+        startCamera();
+      }
     };
-  }, [startCamera]);
+    document.addEventListener('visibilitychange', onVisibility);
+    const onPageHide = () => stopCamera();
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      stopCamera();
+    };
+  }, [startCamera, stopCamera]);
 
   // 탭 포커스: 데스크톱에선 아무 것도 안 함. 모바일에서만 동작.
   const handleTapFocus = async (e) => {
@@ -538,6 +561,8 @@ export default function CameraScreen() {
         if (imageCaptureRef.current?.takePhoto) {
           const raw = await imageCaptureRef.current.takePhoto();
           if (raw) {
+            // 다른 페이지로 이동하므로 즉시 카메라 정리
+            stopCamera();
             navigate('/load', { state: { imageBlob: raw, captureInfo: { source: 'imageCapture' } } });
             return;
           }
@@ -555,6 +580,7 @@ export default function CameraScreen() {
         ctx.drawImage(video, 0, 0, w, h);
         const raw = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.9));
         if (raw) {
+          stopCamera();
           navigate('/load', { state: { imageBlob: raw, captureInfo: { source: 'canvas', width: w, height: h } } });
         } else {
           alert('이미지 캡처 실패. 다시 시도해주세요.');
