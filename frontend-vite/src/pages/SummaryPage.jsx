@@ -309,6 +309,49 @@ export default function SummaryPage() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
   const [pulse, setPulse] = useState(false);
+  const pendingAnswerIndexRef = useRef(null);
+  const pendingQuestionIndexRef = useRef(null);
+
+  // 파형 시각화용 ref들
+  const waveformCanvasRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const animationIdRef = useRef(null);
+  const dataArrayRef = useRef(null);
+  const bufferLengthRef = useRef(0);
+  const phaseRef = useRef(0);
+  const recordStartAtRef = useRef(0);
+  const [recordMs, setRecordMs] = useState(0);
+
+  // 녹음 상태에 따라 파형 시각화 시작/정지
+  useEffect(() => {
+    if (isRecording && streamRef.current) {
+      // 다음 페인트 이후 캔버스가 보장되도록 요청
+      const id = requestAnimationFrame(() => startVisualization(streamRef.current));
+      return () => cancelAnimationFrame(id);
+    } else {
+      stopVisualization();
+    }
+  }, [isRecording]);
+
+  // 녹음 타이머
+  useEffect(() => {
+    if (!isRecording) return;
+    recordStartAtRef.current = Date.now();
+    setRecordMs(0);
+    const id = setInterval(() => {
+      setRecordMs(Date.now() - recordStartAtRef.current);
+    }, 200);
+    return () => clearInterval(id);
+  }, [isRecording]);
+
+  const formatRecordTime = (ms) => {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const mm = Math.floor(totalSec / 60);
+    const ss = String(totalSec % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  };
 
   const ROUTES = {
     TTS: '/api/tts',
@@ -355,10 +398,119 @@ export default function SummaryPage() {
     streamRef.current = null;
   };
 
+  const stopVisualization = () => {
+    try {
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+        animationIdRef.current = null;
+      }
+      if (sourceNodeRef.current) {
+        try { sourceNodeRef.current.disconnect(); } catch {}
+        sourceNodeRef.current = null;
+      }
+      if (analyserRef.current) {
+        try { analyserRef.current.disconnect?.(); } catch {}
+        analyserRef.current = null;
+      }
+      if (audioContextRef.current) {
+        const ctx = audioContextRef.current;
+        audioContextRef.current = null;
+        try { ctx.close(); } catch {}
+      }
+    } catch {}
+  };
+
+  const startVisualization = (stream) => {
+    try {
+      if (animationIdRef.current) return; // already running
+      const Canvas = waveformCanvasRef.current;
+      if (!Canvas) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = audioContextRef.current || new AudioCtx();
+      audioContextRef.current = ctx;
+      try { ctx.resume?.(); } catch {}
+      const source = sourceNodeRef.current || ctx.createMediaStreamSource(stream);
+      sourceNodeRef.current = source;
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      source.connect(analyser);
+
+      bufferLengthRef.current = analyser.frequencyBinCount; // equalizer bars
+      dataArrayRef.current = new Uint8Array(bufferLengthRef.current);
+      phaseRef.current = 0;
+
+      const draw = () => {
+        const canvas = waveformCanvasRef.current;
+        const analyserNode = analyserRef.current;
+        if (!canvas || !analyserNode) return;
+
+        const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+        const cssWidth = canvas.clientWidth || 300;
+        const cssHeight = canvas.clientHeight || 80;
+        if (canvas.width !== cssWidth * dpr || canvas.height !== cssHeight * dpr) {
+          canvas.width = cssWidth * dpr;
+          canvas.height = cssHeight * dpr;
+        }
+
+        const g = canvas.getContext('2d');
+        if (!g) return;
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.clearRect(0, 0, canvas.width, canvas.height);
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const width = cssWidth;
+        const height = cssHeight;
+        const mid = height / 2;
+
+        // 배경
+        g.fillStyle = '#0a0a0a';
+        g.fillRect(0, 0, width, height);
+
+        // 주파수 데이터로 바 그리기 (왼쪽 정렬, 오른쪽은 타이머/버튼 영역 비움)
+        const dataArray = dataArrayRef.current;
+        analyserNode.getByteFrequencyData(dataArray);
+
+        const rightPadding = 140; // 타이머+버튼 영역
+        const drawableWidth = Math.max(0, width - rightPadding);
+        const barCount = Math.min(36, Math.max(14, Math.floor(drawableWidth / 10)));
+        const step = Math.floor(dataArray.length / barCount);
+        const barGap = 4;
+        const barWidth = Math.max(3, Math.floor((drawableWidth / barCount) - barGap));
+        g.strokeStyle = '#ef4444'; // red-500
+        g.lineCap = 'round';
+
+        for (let i = 0; i < barCount; i += 1) {
+          const v = dataArray[i * step] || 0; // 0..255
+          const normalized = v / 255; // 0..1
+          const h = Math.max(6, normalized * height * 0.8);
+          const x = i * (barWidth + barGap) + barWidth / 2 + 16; // 좌측 패딩
+          g.lineWidth = barWidth;
+          g.beginPath();
+          g.moveTo(x, mid - h / 2);
+          g.lineTo(x, mid + h / 2);
+          g.stroke();
+        }
+
+        // 점선은 제거하여 두 번째 이미지 느낌 강화
+
+        animationIdRef.current = requestAnimationFrame(draw);
+      };
+
+      draw();
+    } catch {}
+  };
+
   useEffect(() => {
     return () => {
       stopVoice();
       stopStream();
+      stopVisualization();
     };
   }, []);
 
@@ -482,23 +634,58 @@ export default function SummaryPage() {
           const formData = new FormData();
           formData.append('file', audioBlob, `recording.${ext}`);
 
+          // 1) STT 전에 대기 말풍선 추가
+          pendingQuestionIndexRef.current = null;
+          setChatList((prev) => {
+            const idx = prev.length;
+            pendingQuestionIndexRef.current = idx;
+            return [...prev, { type: 'question-pending', text: '' }];
+          });
+
           await axios.post(u(ROUTES.STT), formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             withCredentials: true,
           }).then((res) => {
             const sttResult = res.data;
-            if (typeof sttResult === 'string' && sttResult.trim()) {
-              handleSend(sttResult);
-            } else if (sttResult?.text?.trim()) {
-              handleSend(sttResult.text.trim());
+            let recognized = '';
+            if (typeof sttResult === 'string') recognized = sttResult.trim();
+            else if (sttResult?.text) recognized = String(sttResult.text).trim();
+
+            if (recognized) {
+              // 2) 대기 말풍선을 실제 질문으로 교체 후 답변 요청
+              setChatList((prev) => {
+                const arr = [...prev];
+                const idx = pendingQuestionIndexRef.current;
+                if (idx != null && arr[idx]) arr[idx] = { type: 'question', text: recognized };
+                else arr.push({ type: 'question', text: recognized });
+                return arr;
+              });
+              // 비동기로 답변 요청 + 대기 말풍선 처리
+              requestAnswerWithPending(recognized);
             } else {
-              alert('음성 인식 결과가 비어있습니다.');
+              // STT 실패 메시지 표시
+              setChatList((prev) => {
+                const arr = [...prev];
+                const idx = pendingQuestionIndexRef.current;
+                const fallback = { type: 'question', text: '음성 인식 결과가 비어있습니다.' };
+                if (idx != null && arr[idx]) arr[idx] = fallback;
+                else arr.push(fallback);
+                return arr;
+              });
             }
           }).catch(() => {
-            alert('STT 요청 실패');
+            setChatList((prev) => {
+              const arr = [...prev];
+              const idx = pendingQuestionIndexRef.current;
+              const fallback = { type: 'question', text: 'STT 요청 실패' };
+              if (idx != null && arr[idx]) arr[idx] = fallback;
+              else arr.push(fallback);
+              return arr;
+            });
           });
         } finally {
           stopStream(); // 마이크 해제
+          stopVisualization(); // 파형 중지
         }
       };
 
@@ -506,6 +693,8 @@ export default function SummaryPage() {
       setMediaRecorder(recorder);
       setIsRecording(true);
       setAudioChunks(chunks);
+      // 사용자 제스처 시점에서 바로 시각화 시작 (iOS 정책 대응)
+      startVisualization(stream);
     } catch {
       alert('마이크 권한이 필요합니다.');
     }
@@ -521,6 +710,42 @@ export default function SummaryPage() {
   const isSendActive = inputValue.trim().length > 0;
 
   // 질문 전송
+  const requestAnswerWithPending = async (finalText) => {
+    // 1) 답변 대기 말풍선 추가
+    pendingAnswerIndexRef.current = null;
+    setChatList((prev) => {
+      const idx = prev.length;
+      pendingAnswerIndexRef.current = idx;
+      return [...prev, { type: 'answer-pending', text: '' }];
+    });
+
+    // 2) 답변 요청 후 교체
+    try {
+      const res = await axios.post(
+        u(ROUTES.ASK),
+        { question: finalText },
+        { withCredentials: true }
+      );
+      const answer = res.data?.answer || res.data?.error || '답변을 가져오지 못했습니다.';
+      setChatList((prev) => {
+        const arr = [...prev];
+        const idx = pendingAnswerIndexRef.current;
+        if (idx != null && arr[idx]) arr[idx] = { type: 'answer', text: answer };
+        else arr.push({ type: 'answer', text: answer });
+        return arr;
+      });
+    } catch {
+      setChatList((prev) => {
+        const arr = [...prev];
+        const idx = pendingAnswerIndexRef.current;
+        const fallback = { type: 'answer', text: '서버 오류로 답변을 가져오지 못했습니다.' };
+        if (idx != null && arr[idx]) arr[idx] = fallback;
+        else arr.push(fallback);
+        return arr;
+      });
+    }
+  };
+
   const handleSend = async (text) => {
     markInteracted();
 
@@ -530,17 +755,7 @@ export default function SummaryPage() {
     setChatList((prev) => [...prev, { type: 'question', text: finalText }]);
     setInputValue('');
 
-    try {
-      const res = await axios.post(
-        u(ROUTES.ASK),
-        { question: finalText },
-        { withCredentials: true }
-      );
-      const answer = res.data?.answer || res.data?.error || '답변을 가져오지 못했습니다.';
-      setChatList((prev) => [...prev, { type: 'answer', text: answer }]);
-    } catch {
-      setChatList((prev) => [...prev, { type: 'answer', text: '서버 오류로 답변을 가져오지 못했습니다.' }]);
-    }
+    requestAnswerWithPending(finalText);
   };
 
   // 맨 아래 스크롤
@@ -581,15 +796,23 @@ export default function SummaryPage() {
 
         {/* 메시지 영역 */}
         <div className="w-full flex flex-col gap-4 p-3 flex-1 overflow-y-auto">
-          {chatList.map((msg, idx) =>
-            msg.type === 'summary' || msg.type === 'answer' ? (
+      {chatList.map((msg, idx) =>
+            msg.type === 'summary' || msg.type === 'answer' || msg.type === 'answer-pending' ? (
               <div
                 key={idx}
                 className="bg-[#fcfafb] p-4 rounded-xl shadow text-[15.5px] leading-relaxed whitespace-pre-line"
               >
-                {msg.text}
+                {msg.type === 'answer-pending' ? (
+                  <span className="text-zinc-500">
+                    <span className="typing-dots">
+                      <span></span><span></span><span></span>
+                    </span>
+                  </span>
+                ) : (
+                  msg.text
+                )}
 
-                {!isRecording && (
+                {!isRecording && msg.type !== 'answer-pending' && msg.text && (
                   <div className="mt-2">
                     {isPlaying && playingId === idx ? (
                       <UIButton
@@ -613,12 +836,20 @@ export default function SummaryPage() {
               <div
                 key={idx}
                 className={`max-w-[75%] px-4 py-3 rounded-[14px] text-[15.5px] leading-[1.55] break-words ${
-                  msg.type === 'question'
+                  msg.type === 'question' || msg.type === 'question-pending'
                     ? 'self-end bg-blue-100 text-blue-900'
                     : 'self-start bg-green-100 text-green-900'
                 }`}
               >
-                {msg.text}
+                {msg.type === 'question-pending' ? (
+                  <span className="text-current">
+                    <span className="typing-dots">
+                      <span></span><span></span><span></span>
+                    </span>
+                  </span>
+                ) : (
+                  msg.text
+                )}
               </div>
             )
           )}
@@ -659,8 +890,7 @@ export default function SummaryPage() {
           </div>
         ) : (
           <div className="w-full px-3 py-3 sticky bottom-0 bg-white">
-            <UIButton
-              className="w-full h-12 rounded-full font-bold text-[17px] text-zinc-800 bg-yellow-300 shadow"
+            <UIButton className="w-full h-12 rounded-full font-bold text-[17px] text-zinc-800 bg-yellow-300 shadow"
               onClick={handleStopRecording}
             >
               <span className="relative mr-2 inline-flex h-2.5 w-2.5 items-center justify-center">
