@@ -5,18 +5,17 @@ import torch
 
 from model_loader import get_model, get_processor
 
-# ====== 경로 설정 ======
+# ===== 경로/파일 =====
 base_dir = Path(__file__).resolve().parent.parent
-out_path = base_dir / "qwen" / "results_time_compare.jsonl"
+out_path = base_dir / "qwen" / "results_hybrid_flash_cls_sdpa_sum.jsonl"
 image_dir = base_dir / "data" / "img"
 image_files = sorted(list(image_dir.glob("*.jpg")) + list(image_dir.glob("*.png")))
 
-# ====== 저장 함수 ======
-def save_result_jsonl(record, path=out_path):
+# ===== 저장 =====
+def save_jsonl(record, path=out_path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
 
 # ====== 분류용 프롬프트 ======
 DOC_TYPE_PROMPT = """
@@ -143,10 +142,11 @@ PROMPT_MAP = {
     "기타": ELSE_PROMPT,
 }
 
-MAX_NEW_TOKENS = 512
+
+MAX_NEW_TOKENS = 256
 WARMUP = 1
 
-# ====== 분류 함수 ======
+# ===== 공통 유틸 =====
 def classify_document(image, model, processor):
     messages = [
         {"role": "user", "content": [
@@ -159,14 +159,13 @@ def classify_document(image, model, processor):
     with torch.no_grad():
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        generated_ids = model.generate(**inputs, max_new_tokens=16)
+        out_ids = model.generate(**inputs, max_new_tokens=16)
         torch.cuda.synchronize()
         t1 = time.perf_counter()
-    trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
-    result = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0].strip()
+    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, out_ids)]
+    result = processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
     return result, (t1 - t0)
 
-# ====== 요약 함수 ======
 def summarize_document(image, prompt_text, model, processor):
     messages = [
         {"role": "user", "content": [
@@ -179,82 +178,89 @@ def summarize_document(image, prompt_text, model, processor):
     with torch.no_grad():
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        generated_ids = model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
+        out_ids = model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
         torch.cuda.synchronize()
         t1 = time.perf_counter()
-    trimmed_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
-    output = processor.batch_decode(trimmed_ids, skip_special_tokens=True)[0].strip()
+    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, out_ids)]
+    output = processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
     return output, (t1 - t0)
 
-# ====== 한 번의 패스 실행 ======
-def run_pass(attn_impl: str, label: str):
+def clear_model_cache():
     get_model.cache_clear()
-    gc.collect(); torch.cuda.empty_cache()
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+
+# ===== 실행 =====
+if __name__ == "__main__":
+    if not image_files:
+        raise SystemExit("이미지 폴더가 비어있어요: data/img/*.jpg|*.png")
+
+    # ---------- 1) Flash ON으로 '분류'만 전체 처리 ----------
+    clear_model_cache()
     try:
-        model = get_model(attn_impl=attn_impl).eval()
+        model_cls = get_model(attn_impl="flash_attention_2").eval()
     except Exception as e:
-        print(f"❌ [{label}] 모델 로드 실패: {e}")
-        return
+        print(f"⚠️ FlashAttention 분류 모델 로드 실패: {e}\n→ sdpa로 대체합니다.")
+        model_cls = get_model(attn_impl="sdpa").eval()
     processor = get_processor()
-    print(f"\n=== [{label}] 시작 (attn_impl={attn_impl}, device={model.device}) ===")
+    print(f"\n=== [분류: Flash ON 우선] device={model_cls.device} ===")
+
+    # 분류 결과 저장: {image_name: (doc_type, classify_s)}
+    classifications = {}
 
     # 워밍업
     if image_files and WARMUP > 0:
         img0 = Image.open(image_files[0]).convert("RGB")
-        _ = classify_document(img0, model, processor)
-        _ = summarize_document(img0, ELSE_PROMPT, model, processor)
+        _ = classify_document(img0, model_cls, processor)
 
-    # 본 실행
     for img_path in image_files:
-        image_id = img_path.stem
         try:
             image = Image.open(img_path).convert("RGB")
         except Exception as e:
-            print(f"⚠️ 이미지 열기 실패: {e}")
+            print(f"이미지 열기 실패: {img_path} - {e}")
+            continue
+        doc_type, t_cls = classify_document(image, model_cls, processor)
+        classifications[img_path] = (doc_type, round(t_cls, 4))
+        print(f"[CLS] {img_path.name}: {doc_type} ({t_cls:.3f}s)")
+
+    # ---------- 2) Flash OFF(SDPA)로 '요약'만 전체 처리 ----------
+    clear_model_cache()
+    model_sum = get_model(attn_impl="sdpa").eval()
+    # processor는 동일
+    print(f"\n=== [요약: Flash OFF(sdpa)] device={model_sum.device} ===")
+
+    # 워밍업
+    if image_files and WARMUP > 0:
+        img0 = Image.open(image_files[0]).convert("RGB")
+        _ = summarize_document(img0, ELSE_PROMPT, model_sum, processor)
+
+    for img_path in image_files:
+        if img_path not in classifications:
+            continue
+        doc_type, cls_s = classifications[img_path]
+        try:
+            image = Image.open(img_path).convert("RGB")
+        except Exception as e:
+            print(f"이미지 열기 실패: {img_path} - {e}")
             continue
 
-        doc_type, t_cls = classify_document(image, model, processor)
         prompt_text = PROMPT_MAP.get(doc_type, ELSE_PROMPT)
-        output, t_sum = summarize_document(image, prompt_text, model, processor)
-
-        total_time = round(t_cls + t_sum, 4)
-        print(f"🖼️ {img_path.name} | 유형:{doc_type} | 총 {total_time}s")
-        print(f"→ 요약: {output}\n")
+        output, sum_s = summarize_document(image, prompt_text, model_sum, processor)
 
         record = {
-            "mode": label,
-            "attn_impl": attn_impl,
+            "mode": "Hybrid(FlashON-CLS,SDPA-SUM)",
             "image": img_path.name,
             "doc_type": doc_type,
             "output": output,
-            "classify_s": round(t_cls, 4),
-            "summary_s": round(t_sum, 4),
-            "total_s": total_time
+            "classify_s": cls_s,
+            "summary_s": round(sum_s, 4),
+            "total_s": round(cls_s + sum_s, 4),
+            "attn_impl_cls": "flash_attention_2",
+            "attn_impl_sum": "sdpa",
+            "max_new_tokens": MAX_NEW_TOKENS,
         }
-        save_result_jsonl(record)
+        save_jsonl(record)
+        print(f"[SUM] {img_path.name}: total {record['total_s']}s | 요약: {output[:80]}...")
 
-# ====== 평균 시간 요약 ======
-def summarize_overall():
-    if not out_path.exists():
-        return
-    rows = [json.loads(l) for l in out_path.read_text(encoding="utf-8").splitlines()]
-    by_mode = {}
-    for r in rows:
-        by_mode.setdefault(r["mode"], []).append(r)
-    print("\n=== 모드별 평균 시간 ===")
-    for mode, items in by_mode.items():
-        avg_cls = sum(x["classify_s"] for x in items) / len(items)
-        avg_sum = sum(x["summary_s"] for x in items) / len(items)
-        avg_total = sum(x["total_s"] for x in items) / len(items)
-        print(f"{mode:<12} 분류 {avg_cls:.3f}s | 요약 {avg_sum:.3f}s | 총 {avg_total:.3f}s (n={len(items)})")
-
-# ====== 실행 ======
-if __name__ == "__main__":
-    if not image_files:
-        raise SystemExit("이미지가 없습니다.")
-
-    run_pass("sdpa", "Flash OFF")              # Flash OFF
-    run_pass("flash_attention_2", "Flash ON")  # Flash ON (설치 필요)
-
-    summarize_overall()
-    print(f"\n✅ 결과 저장 위치: {out_path}")
+    print(f"\n✅ 완료. 결과: {out_path}")
