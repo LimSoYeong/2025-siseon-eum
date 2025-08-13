@@ -108,9 +108,13 @@ export default function LoadingPage() {
       } catch {}
 
       // Blob → File 보정(JPEG 파일명/타입 보장)
-      const file = imageBlob instanceof File
-        ? imageBlob
-        : new File([imageBlob], 'capture.jpg', { type: 'image/jpeg' });
+      // Blob/File 어떤 것이 와도 JPEG로 표준화 (UI 블로킹 줄이기 위해 오버헤드 최소화)
+      let file;
+      if (imageBlob instanceof File) {
+        file = imageBlob.type === 'image/jpeg' ? imageBlob : new File([imageBlob], 'capture.jpg', { type: 'image/jpeg' });
+      } else {
+        file = new File([imageBlob], 'capture.jpg', { type: 'image/jpeg' });
+      }
 
       // FormData 구성 (❗ Content-Type 헤더 수동 지정 금지)
       const fd = new FormData();

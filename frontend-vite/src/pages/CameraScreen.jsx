@@ -471,9 +471,8 @@ export default function CameraScreen() {
       if (imageCaptureRef.current?.takePhoto) {
         const blob = await imageCaptureRef.current.takePhoto();
         if (blob) {
-          // iOS HEIC 등 포함: 업로드 전 FHD JPEG로 표준화
-          const jpeg = await toJpegUnderLimit(blob, 1920, 1080, 0.85);
-          navigate('/load', { state: { imageBlob: jpeg, captureInfo: { source: 'imageCapture' } } });
+          // 변환은 LoadingPage에서 진행하여 즉시 화면 전환되도록 함
+          navigate('/load', { state: { imageBlob: blob, captureInfo: { source: 'imageCapture' } } });
           return;
         }
       }
@@ -490,9 +489,8 @@ export default function CameraScreen() {
       ctx.drawImage(video, 0, 0, w, h);
       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.85));
       if (blob) {
-        // 혹시 큰 해상도면 한 번 더 안전 캡(FHD)
-        const jpeg = await toJpegUnderLimit(blob, 1920, 1080, 0.85);
-        navigate('/load', { state: { imageBlob: jpeg, captureInfo: { source: 'canvas', width: w, height: h } } });
+        // 변환은 LoadingPage에서 진행하여 즉시 화면 전환되도록 함
+        navigate('/load', { state: { imageBlob: blob, captureInfo: { source: 'canvas', width: w, height: h } } });
       } else {
         alert('이미지 캡처 실패. 다시 시도해주세요.');
       }

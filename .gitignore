@@ -38,3 +38,4 @@ ai/qwen/__pycache__/
 
 .faiss
 .pkl
+app.db
