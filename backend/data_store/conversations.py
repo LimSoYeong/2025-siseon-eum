@@ -1,46 +1,49 @@
-import os
-import json
-import time
-from typing import List, Dict
+from db_config import SessionLocal
+from models import Conversation
+from datetime import datetime, timezone
 
+def _to_utc_datetime(ts: float | None) -> datetime:
+    # ts(유닉스 타임스탬프)가 있으면 UTC aware로 변환, 없으면 지금 UTC
+    return (
+        datetime.fromtimestamp(ts, tz=timezone.utc)
+        if ts is not None
+        else datetime.now(timezone.utc)
+    )
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "conversations")
-
-
-def _file_path(user_id: str, doc_id: str) -> str:
-    user_dir = os.path.join(BASE_DIR, user_id)
-    os.makedirs(user_dir, exist_ok=True)
-    return os.path.join(user_dir, f"{doc_id}.json")
-
-
-def append_message(user_id: str, doc_id: str, role: str, text: str, ts: float | None = None) -> None:
-    path = _file_path(user_id, doc_id)
-    record = {
-        "role": role,
-        "text": text,
-        "ts": ts if ts is not None else time.time(),
-    }
-    data: Dict[str, List[Dict]] = {"messages": []}
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {"messages": []}
-    data.setdefault("messages", []).append(record)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def get_conversation(user_id: str, doc_id: str) -> List[Dict]:
-    path = _file_path(user_id, doc_id)
-    if not os.path.exists(path):
-        return []
+# 저장
+def append_message(user_id: str, doc_id: str, role: str, text: str, ts: float | None = None):
+    db = SessionLocal()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("messages", [])
-    except Exception:
-        return []
+        message = Conversation(
+            user_id=user_id,
+            doc_id=doc_id,
+            role=role,
+            text=text,
+            ts=_to_utc_datetime(ts),
+        )
+        db.add(message)
+        db.commit()
+    finally:
+        db.close()
 
+# 조회
+def get_conversation(user_id: str, doc_id: str):
+    db = SessionLocal()
+    try:
+        records = (
+            db.query(Conversation)
+            .filter_by(user_id=user_id, doc_id=doc_id)
+            .order_by(Conversation.ts)
+            .all()
+        )
 
+        result = []
+        for r in records:
+            # 과거 데이터가 naive일 수 있으니 UTC로 간주해 tzinfo 보정
+            dt = r.ts if r.ts is not None else datetime.now(timezone.utc)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            result.append({"role": r.role, "text": r.text, "ts": dt.timestamp()})
+        return result
+    finally:
+        db.close()
