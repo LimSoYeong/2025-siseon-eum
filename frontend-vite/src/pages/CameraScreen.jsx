@@ -1,7 +1,6 @@
-//CameraScreen.jsx 해상도 + 초점 맞추기 기능 코드 
-
+// 웹 -> 링, 초점 비활성화 모바일 -> 초점 지원시 웹카메라 초점 미지원시 네이티브 카메라로 직행
 // src/pages/CameraScreen.jsx
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
 
@@ -13,181 +12,199 @@ export default function CameraScreen() {
   const trackRef = useRef(null);
   const imageCaptureRef = useRef(null);
 
-  const [focusUI, setFocusUI] = useState(null);     // { xPx, yPx } 탭 포커스 링 표시
-  const [vsize, setVsize] = useState({ w: 0, h: 0 }); // 현재 입력 해상도 표시용
+  const [focusUI, setFocusUI] = useState(null); // { xPx, yPx }
+  const [vsize, setVsize] = useState({ w: 0, h: 0 });
+  const [focusSupported, setFocusSupported] = useState(false); // (기기/브라우저) 초점 제어 지원 여부
+  const [toast, setToast] = useState('');
   const navigate = useNavigate();
 
-  // 카메라 시작
-  useEffect(() => {
-    let mounted = true;
-
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: 'environment' }, // 후면 선호
-            width:  { ideal: 2560 },              // 가능하면 더 높은 해상도 시도
-            height: { ideal: 1440 },
-            frameRate: { ideal: 30 },
-          },
-        });
-
-        if (!mounted) return;
-        streamRef.current = stream;
-
-        const track = stream.getVideoTracks()[0];
-        trackRef.current = track;
-
-        // 해상도 capability 기반 재적용(가능한 범위 내 최대)
-        try {
-          const caps = track.getCapabilities?.();
-          if (caps?.width && caps?.height) {
-            const targetW = Math.min(2560, caps.width.max ?? 2560);
-            const targetH = Math.min(1440, caps.height.max ?? 1440);
-            await track.applyConstraints({ advanced: [{ width: targetW, height: targetH }] });
-          }
-        } catch {}
-
-        // ImageCapture 준비(지원되는 브라우저에서)
-        try {
-          if ('ImageCapture' in window && typeof ImageCapture === 'function') {
-            imageCaptureRef.current = new ImageCapture(track);
-          }
-        } catch {}
-
-        // 자동 초점(가능 시)
-        try {
-          const caps = track.getCapabilities?.();
-          if (caps?.focusMode) {
-            if (caps.focusMode.includes('continuous')) {
-              await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-            } else if (caps.focusMode.includes('auto')) {
-              await track.applyConstraints({ advanced: [{ focusMode: 'auto' }] });
-            }
-          }
-          if (imageCaptureRef.current?.getPhotoCapabilities) {
-            const pc = await imageCaptureRef.current.getPhotoCapabilities();
-            if (pc?.focusMode?.includes?.('continuous')) {
-              await imageCaptureRef.current.setOptions({ focusMode: 'continuous' });
-            }
-          }
-        } catch {}
-
-        // 비디오 연결 및 해상도 메타 갱신
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          video.playsInline = true;
-          const onLoaded = () => setVsize({ w: video.videoWidth, h: video.videoHeight });
-          video.addEventListener('loadedmetadata', onLoaded, { once: true });
-          await video.play().catch(() => {});
-        }
-      } catch (err) {
-        console.error('camera start failed', err);
-        alert('카메라 권한이 없거나 접근 실패');
-      }
-    };
-
-    startCamera();
-
-    return () => {
-      mounted = false;
-      streamRef.current?.getTracks()?.forEach((t) => t.stop());
-    };
+  // 모바일 판정(터치+뷰포트+UA 혼합)
+  const isMobile = useMemo(() => {
+    const ua = navigator.userAgent || '';
+    const mobileUA = /Android|iPhone|iPad|iPod/i.test(ua);
+    const touch = (navigator.maxTouchPoints || 0) > 0;
+    const small = Math.min(window.innerWidth, window.innerHeight) < 820;
+    const isWindows = /Windows NT/i.test(ua);
+    return mobileUA || (touch && small && !isWindows);
   }, []);
 
-  // 탭해서 초점 맞추기(지원되는 기기/브라우저에서 동작)
+  // “웹상에선 링 미지원” 규칙 반영 → 링 활성 조건
+  const focusRingEnabled = isMobile && focusSupported;
+
+  const showToast = useCallback((msg, ms = 2000) => {
+    setToast(msg);
+    if (ms) setTimeout(() => setToast(''), ms);
+  }, []);
+
+  
+
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 2560 },
+          height: { ideal: 1440 },
+          frameRate: { ideal: 30 },
+        },
+      });
+
+      streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      trackRef.current = track;
+
+      // 가능한 최대 해상도로 상향
+      try {
+        const caps = track.getCapabilities?.();
+        if (caps?.width && caps?.height) {
+          const targetW = Math.min(2560, caps.width.max ?? 2560);
+          const targetH = Math.min(1440, caps.height.max ?? 1440);
+          await track.applyConstraints({ advanced: [{ width: targetW, height: targetH }] });
+        }
+      } catch {}
+
+      // ImageCapture 준비
+      try {
+        if ('ImageCapture' in window && typeof ImageCapture === 'function') {
+          imageCaptureRef.current = new ImageCapture(track);
+        }
+      } catch {}
+
+      // 자동초점 기본 적용(가능 시)
+      try {
+        const caps = track.getCapabilities?.();
+        if (caps?.focusMode) {
+          if (caps.focusMode.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          } else if (caps.focusMode.includes('auto')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'auto' }] });
+          }
+        }
+        if (imageCaptureRef.current?.getPhotoCapabilities) {
+          const pc = await imageCaptureRef.current.getPhotoCapabilities();
+          if (pc?.focusMode?.includes?.('continuous')) {
+            await imageCaptureRef.current.setOptions({ focusMode: 'continuous' });
+          }
+        }
+      } catch {}
+
+      // 초점 제어 지원성 감지
+      try {
+        const caps = track.getCapabilities?.();
+        const supported =
+          !!(caps && (caps.focusMode || caps.pointsOfInterest)) ||
+          !!(imageCaptureRef.current && imageCaptureRef.current.setOptions);
+        setFocusSupported(Boolean(supported));
+        
+      } catch {}
+
+      // 비디오 연결/표시
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        video.playsInline = true;
+        const onLoaded = () => setVsize({ w: video.videoWidth, h: video.videoHeight });
+        video.addEventListener('loadedmetadata', onLoaded, { once: true });
+        await video.play().catch(() => {});
+      }
+    } catch (err) {
+      console.error('camera start failed', err);
+      alert('카메라 권한이 없거나 접근 실패');
+    }
+  }, []);
+
+  // 시작/정리
+  useEffect(() => {
+    startCamera();
+    return () => {
+      streamRef.current?.getTracks()?.forEach((t) => t.stop());
+    };
+  }, [startCamera]);
+
+  // 탭 포커스: 데스크톱에선 아무 것도 안 함. 모바일에서만 동작.
   const handleTapFocus = async (e) => {
+    if (!isMobile) return; // 규칙 1: 웹에선 링/포커스 비활성
+
     const video = videoRef.current;
     if (!video) return;
 
+    // 모바일 + 미지원이면 아무 동작도 하지 않음(네이티브 호출 제거)
+    if (!focusSupported) return;
+
+    // (모바일 + 지원) → 링 표시 + 포커스 시도
     const rect = video.getBoundingClientRect();
     const cx = e.clientX ?? e.touches?.[0]?.clientX;
     const cy = e.clientY ?? e.touches?.[0]?.clientY;
-    const normX = (cx - rect.left) / rect.width;   // 0~1
-    const normY = (cy - rect.top) / rect.height;   // 0~1
+    const normX = (cx - rect.left) / rect.width;
+    const normY = (cy - rect.top) / rect.height;
 
-    // 화면 포커스 링 표시
     setFocusUI({ xPx: cx - rect.left, yPx: cy - rect.top });
     setTimeout(() => setFocusUI(null), 900);
 
-    const track = trackRef.current;
-
-    // 1) ImageCapture 우선
+    // ImageCapture 우선 → 트랙 제약
     try {
       if (imageCaptureRef.current?.setOptions) {
         await imageCaptureRef.current.setOptions({
-          pointsOfInterest: [{ x: normX, y: normY }], // 일부 브라우저에서만
+          pointsOfInterest: [{ x: normX, y: normY }],
           focusMode: 'single-shot',
         });
         return;
       }
-    } catch (err) {
-      console.debug('ImageCapture.setOptions failed', err);
-    }
+    } catch {}
 
-    // 2) 트랙 제약으로 시도
     try {
-      if (track?.applyConstraints) {
-        const caps = track.getCapabilities?.();
-        await track.applyConstraints({
-          advanced: [
-            {
-              pointsOfInterest: [{ x: normX, y: normY }],
-              ...(caps?.focusMode?.includes?.('single-shot') ? { focusMode: 'single-shot' } : {}),
-              ...(caps?.focusMode?.includes?.('continuous') ? { focusMode: 'continuous' } : {}),
-            },
-          ],
-        });
-      }
-    } catch (err) {
-      console.debug('track.applyConstraints focus failed', err);
-    }
+      const track = trackRef.current;
+      const caps = track?.getCapabilities?.();
+      await track?.applyConstraints?.({
+        advanced: [
+          {
+            pointsOfInterest: [{ x: normX, y: normY }],
+            ...(caps?.focusMode?.includes?.('single-shot') ? { focusMode: 'single-shot' } : {}),
+            ...(caps?.focusMode?.includes?.('continuous') ? { focusMode: 'continuous' } : {}),
+          },
+        ],
+      });
+    } catch {}
   };
 
-  // 촬영: ImageCapture(풀해상도) → 캔버스 폴백
+  // 재초점(스트림 재시작)
+  const refocusTrick = async () => {
+    try { streamRef.current?.getTracks()?.forEach((t) => t.stop()); } catch {}
+    await startCamera();
+    showToast('재초점 시도 중...');
+  };
+
+  
+
+  // 촬영: ImageCapture → 캔버스 폴백
   const takePhoto = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+    if (video.readyState < 2) { alert('카메라가 아직 준비되지 않았습니다'); return; }
 
-    if (video.readyState < 2) {
-      alert('카메라가 아직 준비되지 않았습니다');
-      return;
-    }
-
-    // 1) ImageCapture 우선(가능 시 풀해상도 스틸)
     try {
       if (imageCaptureRef.current?.takePhoto) {
         const blob = await imageCaptureRef.current.takePhoto();
         if (blob) {
-          navigate('/load', { state: { imageBlob: blob } });
+          navigate('/load', { state: { imageBlob: blob, captureInfo: { source: 'imageCapture' } } });
           return;
         }
       }
-    } catch (err) {
-      console.debug('ImageCapture.takePhoto failed, fallback to canvas', err);
-    }
+    } catch {}
 
-    // 2) 캔버스 폴백(현재 프레임 실제 해상도)
     try {
       const track = trackRef.current;
-      const settings = track?.getSettings?.() ?? {};
-      const w = settings.width || video.videoWidth || 1280;
-      const h = settings.height || video.videoHeight || 720;
-
-      canvas.width = w;
-      canvas.height = h;
+      const s = track?.getSettings?.() ?? {};
+      const w = s.width || video.videoWidth || 1280;
+      const h = s.height || video.videoHeight || 720;
+      canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, w, h);
-
       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
-      if (blob) {
-        navigate('/load', { state: { imageBlob: blob } });
-      } else {
-        alert('이미지 캡처 실패. 다시 시도해주세요.');
-      }
+      if (blob) navigate('/load', { state: { imageBlob: blob, captureInfo: { source: 'canvas', width: w, height: h } } });
+      else alert('이미지 캡처 실패. 다시 시도해주세요.');
     } catch (err) {
       console.error('canvas capture failed', err);
       alert('이미지 캡처 실패. 다시 시도해주세요.');
@@ -205,13 +222,13 @@ export default function CameraScreen() {
         playsInline
         className="w-full h-full object-cover touch-manipulation"
         onPointerDown={handleTapFocus}
-        onTouchStart={handleTapFocus} // 일부 iOS 호환
+        onTouchStart={handleTapFocus}
       />
 
-      {/* 탭 포커스 링 */}
-      {focusUI && (
+      {/* 탭 포커스 링: 모바일 + 지원일 때만 */}
+      {focusRingEnabled && focusUI && (
         <div
-          className="pointer-events-none absolute border-2 border-yellow-400 rounded-full transition-opacity duration-300"
+          className="pointer-events-none absolute z-10 border-2 border-yellow-400 rounded-full transition-opacity duration-300"
           style={{
             width: 64,
             height: 64,
@@ -222,13 +239,22 @@ export default function CameraScreen() {
         />
       )}
 
-      {/* 현재 입력 해상도 뱃지(확인용) */}
+      {/* 토스트 */}
+      {toast && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm px-3 py-2 rounded z-20">
+          {toast}
+        </div>
+      )}
+
+      {/* 현재 해상도 뱃지 */}
       <div className="absolute bottom-2 right-2 text-[11px] bg-black/60 text-white px-2 py-1 rounded z-10">
         {vsize.w}×{vsize.h}
       </div>
 
       {/* 캡처용 캔버스(숨김) */}
       <canvas ref={canvasRef} width="360" height="640" className="hidden" />
+
+      
 
       {/* ← 뒤로가기 */}
       <UIButton
@@ -238,12 +264,22 @@ export default function CameraScreen() {
         ← 뒤로가기
       </UIButton>
 
-      {/* ● 촬영 버튼 */}
+      {/* ● 촬영 버튼(웹카메라 경로용) */}
       <UIButton
         aria-label="촬영"
         onClick={takePhoto}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[90px] h-[90px] rounded-full bg-white border-[4px] border-gray-300 z-10"
       />
+
+      {/* 재초점(스트림 재시작) */}
+      <UIButton
+        onClick={refocusTrick}
+        className="absolute top-5 right-5 px-3 py-2 text-white text-xs rounded-md z-10 bg-black/40"
+      >
+        재초점
+      </UIButton>
+
+      
     </div>
   );
 }

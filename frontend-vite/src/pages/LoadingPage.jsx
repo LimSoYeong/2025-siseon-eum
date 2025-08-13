@@ -114,10 +114,19 @@ export default function LoadingPage() {
         return;
       }
 
+      // 전송 직전 진단 로그
+      try {
+        const imgType = imageBlob?.type;
+        const imgSizeMB = imageBlob ? (imageBlob.size / (1024 * 1024)).toFixed(2) : 'N/A';
+        const cap = location.state?.captureInfo || {};
+        const width = cap.width || 'unknown';
+        const height = cap.height || 'unknown';
+        const ua = navigator.userAgent;
+        console.log('[Upload Debug] type:', imgType, 'size(MB):', imgSizeMB, 'frame:', `${width}x${height}`, 'UA:', ua, 'source:', cap.source || 'unknown');
+      } catch {}
+
       const formData = new FormData();
       formData.append('image', imageBlob, 'photo.jpg');
-
-      console.log('[Debug] FormData:', formData.get('image'));
 
       try {
         const response = await axios.post(
