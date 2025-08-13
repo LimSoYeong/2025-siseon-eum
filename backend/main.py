@@ -13,6 +13,15 @@ from langserve_app.session_router import router as session_router
 
 app = FastAPI()
 
+# DB 테이블 보장 생성 (서버 시작 시 한 번)
+try:
+    from db_config import Base, engine
+    from models import Conversation, RecentDoc  # noqa: F401
+    Base.metadata.create_all(bind=engine)
+    print("✅ DB 테이블 준비 완료")
+except Exception as e:
+    print(f"[WARN] DB 초기화 실패: {e}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
