@@ -36,6 +36,21 @@ backend/faiss_dbai/qwen/.env
 ai/qwen/cached_embeds/
 ai/qwen/__pycache__/
 
+backend/venv-backend/
+backend/__pycache__/
+**/__pycache__/
+*.py[cod]
+
+frontend-vite/node_modules/
+frontend-vite/dist/
+frontend-vite/.vite/
+frontend-vite/.env*
+
+/tmp/
+/root/tmp/
+*.log
+*.pid
+
 .faiss
 .pkl
 app.db
