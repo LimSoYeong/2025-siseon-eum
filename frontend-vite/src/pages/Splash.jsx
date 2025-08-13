@@ -51,23 +51,25 @@
 //   }
 // };
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
 
 export default function Splash() {
   const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    // 1.5초 후 /home으로 이동
+    // /home으로 이동 트랜지션
     const timeout = setTimeout(() => {
-      navigate('/home');
+      setLeaving(true);
+      setTimeout(() => navigate('/home'), 300); // 애니메이션 시간과 맞춤
     }, 1500);
     return () => clearTimeout(timeout);
   }, [navigate]);
 
   return (
-    <div className="w-full max-w-[400px] min-h-[80vh] mx-auto flex flex-col items-center justify-center bg-[var(--bg-color)] p-[38px_0]">
+    <div className={`w-full max-w-[400px] min-h-[80vh] mx-auto flex flex-col items-center justify-center bg-[var(--bg-color)] p-[38px_0] ${leaving ? 'animate-fade-out-up' : 'animate-fade-slide'}`}>
       <h1 className="text-[32px] font-bold mt-[18px] mb-[30px] tracking-tight text-center">
         시선이음
       </h1>

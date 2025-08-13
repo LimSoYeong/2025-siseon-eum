@@ -5,3 +5,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes fade-slide {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-slide { animation: fade-slide 240ms ease-out; }
+
+@keyframes fade-out-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+.animate-fade-out-up { animation: fade-out-up 260ms ease-in forwards; }
