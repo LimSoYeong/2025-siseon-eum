@@ -4,8 +4,6 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime
 from datetime import datetime, timezone
 
-mtime = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
 def _to_utc_datetime(ts: float | None) -> datetime:
     # ts(유닉스 타임스탬프)가 있으면 UTC aware로 변환, 없으면 지금 UTC
     return (

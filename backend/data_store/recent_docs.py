@@ -1,10 +1,6 @@
 from db_config import SessionLocal
 from models import RecentDoc
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime
-from datetime import datetime, timezone
-
-mtime = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 def _to_utc_datetime(ts: float | None) -> datetime:
     # 타임스탬프가 있으면 UTC aware로, 없으면 현재 UTC aware로
