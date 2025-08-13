@@ -154,7 +154,13 @@ export default function LoadingPage() {
       fd.append('image', file, file.name);
 
       try {
-        const res = await fetch(`${API_BASE}/api/start_session`, {
+        // 안전한 엔드포인트 구성(+ /undefined 방어)
+        const rawBase = API_BASE || window.location.origin;
+        const base = rawBase.replace(/\/undefined\/?$/, '').replace(/\/+$|\/$/g, '');
+        const endpoint = new URL('/api/start_session', base).toString();
+        try { console.log('[Upload Debug] endpoint:', endpoint, 'VITE_API_URL:', API_BASE); } catch {}
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           body: fd,
           credentials: 'include', // 쿠키 인증 안 쓰면 이 줄 제거
