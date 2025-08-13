@@ -1,4 +1,3 @@
-// 웹 -> 링, 초점 비활성화 모바일 -> 초점 지원시 웹카메라 초점 미지원시 네이티브 카메라로 직행
 // src/pages/CameraScreen.jsx
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
