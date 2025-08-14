@@ -8,10 +8,19 @@ export default function UIButton({
   type = 'button',
   children,
 }) {
+  const baseHover = [
+    'cursor-pointer select-none',
+    'transition-all duration-200 ease-out',
+    'hover:opacity-100 active:opacity-95',
+    'hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:scale-95',
+    'hover:ring-4 hover:ring-yellow-300',
+    'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300',
+    'disabled:opacity-50 disabled:cursor-not-allowed'
+  ].join(' ');
   return (
     <button
       type={type}
-      className={className}
+      className={`${baseHover} ${className}`}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={title}
