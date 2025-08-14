@@ -2,9 +2,7 @@
 // src/pages/LoadingPage.jsx
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { IMAGE_UPLOAD_CONFIG } from '../config/appConfig';
-
-const API_BASE = import.meta.env.VITE_API_URL; // 배포/개발 정의
+import { IMAGE_UPLOAD_CONFIG, API_BASE } from '../config/appConfig';
 
 export default function LoadingPage() {
   const navigate = useNavigate();

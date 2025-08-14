@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
-const API_BASE = import.meta.env.VITE_API_URL;
+import { API_BASE } from '../config/appConfig';
 
 export default function HomeScreen() {
   const navigate = useNavigate();

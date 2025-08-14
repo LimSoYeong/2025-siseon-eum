@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
-import { isMobileDevice, CAMERA_CONFIG } from '../config/appConfig';
+import { isMobileDevice, CAMERA_CONFIG, API_BASE } from '../config/appConfig';
 
 export default function CameraScreen() {
   const videoRef = useRef(null);
