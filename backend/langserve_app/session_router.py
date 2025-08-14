@@ -6,7 +6,14 @@ from .conversation_chain import ImageChatRunnable
 import os
 import time
 from data_store.conversations import append_message, get_conversation
-from data_store.recent_docs import add_recent_doc, list_recent_docs, delete_recent_doc
+from data_store.recent_docs import (
+    add_recent_doc,
+    list_recent_docs,
+    delete_recent_doc,
+    get_recent_doc,
+    get_recent_doc_by_doc_id,
+    get_latest_doc_for_user,
+)
 
 router = APIRouter(prefix="/api")
 sessions = {}
@@ -77,8 +84,31 @@ async def ask_question(request: Request, user_id: str = Cookie(None)):
     question = body.get("question")
     doc_id = body.get("doc_id") or latest_doc_id_by_user.get(user_id)
 
+    # 세션이 유실된 경우 DB에서 복구 시도
     if user_id not in sessions:
-        return {"error": "세션이 존재하지 않습니다. 먼저 /start_session 호출하세요."}
+        # 1) doc_id+user_id로 복원 시도
+        restored = False
+        if user_id and doc_id:
+            doc = get_recent_doc(user_id=user_id, doc_id=doc_id) or get_recent_doc_by_doc_id(doc_id)
+            if doc and doc.get("path") and os.path.exists(doc["path"]):
+                try:
+                    sessions[user_id] = ImageChatRunnable(doc["path"])  # 세션 복원
+                    latest_doc_id_by_user[user_id] = doc.get("doc_id", doc_id)
+                    restored = True
+                except Exception as e:
+                    print(f"[WARN] 세션 복원 실패: user_id={user_id} doc_id={doc_id} error={e}")
+        # 2) user_id만 있고 doc_id 없으면 가장 최근 문서로 복원
+        if not restored and user_id and not doc_id:
+            doc = get_latest_doc_for_user(user_id)
+            if doc and doc.get("path") and os.path.exists(doc["path"]):
+                try:
+                    sessions[user_id] = ImageChatRunnable(doc["path"])  # 세션 복원
+                    latest_doc_id_by_user[user_id] = doc.get("doc_id")
+                    restored = True
+                except Exception as e:
+                    print(f"[WARN] 세션 복원(최근문서) 실패: user_id={user_id} error={e}")
+        if user_id not in sessions:
+            return {"error": "세션이 존재하지 않습니다. 먼저 /start_session 호출하세요."}
 
     if not doc_id:
         return {"error": "대화 문서 식별자(doc_id)가 없습니다. 먼저 /start_session을 호출하세요."}
