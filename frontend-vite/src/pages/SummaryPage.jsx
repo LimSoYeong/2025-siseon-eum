@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Mic } from 'lucide-react';
 import UIButton from '../components/common/UIButton';
+import RecordingEqualizer from '../components/RecordingEqualizer';
 
 export default function SummaryPage() {
   const location = useLocation();
@@ -42,6 +43,10 @@ export default function SummaryPage() {
   const phaseRef = useRef(0);
   const recordStartAtRef = useRef(0);
   const [recordMs, setRecordMs] = useState(0);
+  const timeDomainArrayRef = useRef(null);
+  const recordLevelRef = useRef(0);
+  const [recordLevel, setRecordLevel] = useState(0);
+  const levelTickRef = useRef(0);
 
   // 녹음 상태에 따라 파형 시각화 시작/정지
   useEffect(() => {
@@ -162,6 +167,7 @@ export default function SummaryPage() {
 
       bufferLengthRef.current = analyser.frequencyBinCount; // equalizer bars
       dataArrayRef.current = new Uint8Array(bufferLengthRef.current);
+      timeDomainArrayRef.current = new Uint8Array(analyser.fftSize);
       phaseRef.current = 0;
 
       const draw = () => {
@@ -192,8 +198,28 @@ export default function SummaryPage() {
         g.fillRect(0, 0, width, height);
 
         // 주파수 데이터로 바 그리기 (왼쪽 정렬, 오른쪽은 타이머/버튼 영역 비움)
-        const dataArray = dataArrayRef.current;
-        analyserNode.getByteFrequencyData(dataArray);
+        // 마이크 레벨 추정(시간영역 RMS 기반) -> Equalizer로 전달
+        let td = timeDomainArrayRef.current;
+        if (!td || td.length !== analyserNode.fftSize) {
+          td = new Uint8Array(analyserNode.fftSize);
+          timeDomainArrayRef.current = td;
+        }
+        analyserNode.getByteTimeDomainData(td);
+        let sumSq = 0;
+        for (let i = 0; i < td.length; i += 1) {
+          const centered = (td[i] - 128) / 128; // -1..1
+          sumSq += centered * centered;
+        }
+        const rms = Math.sqrt(sumSq / td.length); // 0..~
+        // 노이즈 바닥 제거/스케일: 약 0.02 아래는 0으로 클램프, 0.22 근방에서 1.0 근사
+        const level = Math.min(1, Math.max(0, (rms - 0.02) / 0.22));
+        recordLevelRef.current = level;
+        // UI 업데이트는 60~120ms로 스로틀링하여 리렌더 비용 절감
+        const nowTs = performance.now ? performance.now() : Date.now();
+        if (!levelTickRef.current || nowTs - levelTickRef.current > 90) {
+          levelTickRef.current = nowTs;
+          setRecordLevel(level);
+        }
 
         const rightPadding = 140; // 타이머+버튼 영역
         const drawableWidth = Math.max(0, width - rightPadding);
@@ -609,6 +635,9 @@ export default function SummaryPage() {
           </div>
         ) : (
           <div className="w-full px-3 py-3 sticky bottom-0 bg-white">
+            {/* 레벨 계산을 위한 숨김 캔버스 (시각화는 Equalizer로 대체) */}
+            <canvas ref={waveformCanvasRef} className="hidden" width={300} height={80} />
+            <RecordingEqualizer label="녹음 중입니다..." />
             <UIButton className="w-full h-12 rounded-full font-bold text-[17px] text-zinc-800 bg-yellow-300 shadow"
               onClick={handleStopRecording}
             >
