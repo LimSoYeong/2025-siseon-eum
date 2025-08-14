@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
+import { isMobileDevice, CAMERA_CONFIG } from '../config/appConfig';
 
 export default function CameraScreen() {
   const videoRef = useRef(null);
@@ -35,14 +36,7 @@ export default function CameraScreen() {
   }, [viewportH]);
 
   // 모바일 판정(터치+뷰포트+UA 혼합)
-  const isMobile = useMemo(() => {
-    const ua = navigator.userAgent || '';
-    const mobileUA = /Android|iPhone|iPad|iPod/i.test(ua);
-    const touch = (navigator.maxTouchPoints || 0) > 0;
-    const small = Math.min(window.innerWidth, window.innerHeight) < 820;
-    const isWindows = /Windows NT/i.test(ua);
-    return mobileUA || (touch && small && !isWindows);
-  }, []);
+  const isMobile = useMemo(() => isMobileDevice(), []);
 
   // “웹상에선 링 미지원” 규칙 반영 → 링 활성 조건
   const focusRingEnabled = isMobile && focusSupported;
@@ -54,13 +48,14 @@ export default function CameraScreen() {
 
   const startCamera = useCallback(async () => {
     try {
+      const pref = isMobile ? CAMERA_CONFIG.MOBILE : CAMERA_CONFIG.DESKTOP;
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 2560 },
-          height: { ideal: 1440 },
-          frameRate: { ideal: 30 },
+          width: { ideal: pref.width },
+          height: { ideal: pref.height },
+          frameRate: { ideal: pref.frameRate },
         },
       });
 

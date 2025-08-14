@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export default function HomeScreen() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const fetchDocs = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/recent_docs`, {
+        const res = await fetch(`${API_BASE}/api/recent_docs`, {
           credentials: 'include'
         });
         const data = await res.json();
@@ -17,7 +18,7 @@ export default function HomeScreen() {
           docId: it.doc_id || String(it.mtime || ''),
           date: new Date((it.mtime || 0) * 1000).toLocaleDateString('ko-KR').slice(2),
           title: '문서',
-          thumb: `${import.meta.env.VITE_API_URL}/api/image?path=${encodeURIComponent(it.path || '')}`
+          thumb: `${API_BASE}/api/image?path=${encodeURIComponent(it.path || '')}`
         }));
         setDocs(items);
       } catch (e) {
@@ -41,7 +42,7 @@ export default function HomeScreen() {
     const ok = window.confirm('해당 문서를 삭제하시겠어요?');
     if (!ok) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/delete_doc`, {
+      const res = await fetch(`${API_BASE}/api/delete_doc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
