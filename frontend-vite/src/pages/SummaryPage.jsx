@@ -312,6 +312,8 @@ export default function SummaryPage() {
   // 녹음 시작
   const handleMicClick = async () => {
     if (isRecording) return;
+    // 이미 재생 중인 답변 TTS가 있다면 즉시 중지
+    stopVoice();
     markInteracted();
 
     if (!navigator.mediaDevices?.getUserMedia) {
