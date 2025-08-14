@@ -64,7 +64,7 @@ export default function HomeScreen() {
         {docs.map((doc, i) => (
           <div
             key={i}
-            className="relative flex items-center gap-6 p-5 bg-white border border-gray-200 rounded-[15px] shadow-[0_6px_18px_rgba(0,0,0,0.12)] cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1 hover:ring-4 hover:ring-yellow-200"
+            className="relative flex items-center gap-6 p-5 bg-white border border-gray-200 rounded-[15px] shadow-[0_6px_18px_rgba(0,0,0,0.12)] cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1"
             onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId, fromHome: true } })}
           >
             <div className="w-[70px] h-[70px] rounded-[5px] bg-gray-700 overflow-hidden flex-shrink-0">
@@ -79,7 +79,7 @@ export default function HomeScreen() {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); handleDeleteDoc(doc); }}
-              className="absolute top-6 right-7 text-[15px] text-gray-700 transition-all duration-200 hover:text-black hover:bg-yellow-100 hover:ring-4 hover:ring-yellow-200 hover:shadow px-2 py-1 rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300"
+              className="absolute top-6 right-7 text-[15px] text-gray-700 transition-all duration-200 hover:text-black hover:bg-gray-100 hover:shadow px-2 py-1 rounded focus-visible:outline-none"
               aria-label="문서 삭제"
             >
               삭제
