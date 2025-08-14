@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Mic } from 'lucide-react';
 import UIButton from '../components/common/UIButton';
-const API_BASE = import.meta.env.VITE_API_URL;
+import { API_BASE } from '../config/appConfig';
 
 export default function SummaryPage() {
   const location = useLocation();

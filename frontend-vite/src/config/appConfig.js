@@ -32,4 +32,16 @@ export const TIMING = Object.freeze({
   pageAnimMs: 300,
 });
 
+// API 베이스 URL: .env > 전역 오버라이드 > 현재 오리진 순으로 결정
+function normalizeBase(base) {
+  if (!base) return '';
+  return String(base).replace(/\/$/, '');
+}
+
+export const API_BASE = normalizeBase(
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof window !== 'undefined' && (window.__API_BASE__ || window.location?.origin)) ||
+    ''
+);
+
 
