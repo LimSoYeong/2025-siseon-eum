@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
+import { TIMING } from '../config/appConfig';
 
 export default function Splash() {
   const navigate = useNavigate();
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    // /home으로 이동 트랜지션
     const timeout = setTimeout(() => {
       setLeaving(true);
-      setTimeout(() => navigate('/home'), 300); // 애니메이션 시간과 맞춤
-    }, 1500);
+      setTimeout(() => navigate('/home'), TIMING.pageAnimMs);
+    }, TIMING.splashDelayMs);
     return () => clearTimeout(timeout);
   }, [navigate]);
 

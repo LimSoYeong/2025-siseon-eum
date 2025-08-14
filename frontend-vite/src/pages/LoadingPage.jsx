@@ -2,8 +2,9 @@
 // src/pages/LoadingPage.jsx
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { IMAGE_UPLOAD_CONFIG } from '../config/appConfig';
 
-const API_BASE = import.meta.env.VITE_API_URL; // e.g., https://siseon-eum.site
+const API_BASE = import.meta.env.VITE_API_URL; // 배포/개발 정의
 
 export default function LoadingPage() {
   const navigate = useNavigate();
@@ -26,9 +27,7 @@ export default function LoadingPage() {
 
       // ------- 업로드 전 표준화(리사이징+JPEG) -------
       // 목표: 용량 과다/HEIC 등으로 인한 413·처리 실패 방지
-      const MAX_W = 1920;
-      const MAX_H = 1920;
-      const JPEG_Q = 0.8;
+      const { MAX_W, MAX_H, JPEG_Q } = IMAGE_UPLOAD_CONFIG;
 
       // 전송 직전 진단 로그
       try {
