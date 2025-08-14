@@ -70,3 +70,77 @@ def delete_recent_doc(user_id: str, doc_id: str, path: str | None = None):
     finally:
         db.close()
     return {"removed": removed, "file_removed": False}
+
+# 단건 조회 (세션 복원을 위해 사용)
+def get_recent_doc(user_id: str, doc_id: str) -> dict | None:
+    db = SessionLocal()
+    try:
+        r = (
+            db.query(RecentDoc)
+            .filter_by(user_id=user_id, doc_id=doc_id)
+            .first()
+        )
+        if not r:
+            return None
+        dt = r.mtime or datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return {
+            "doc_id": r.doc_id,
+            "path": r.path,
+            "mtime": dt.timestamp(),
+            "title": r.title,
+            "doc_type": r.doc_type,
+        }
+    finally:
+        db.close()
+
+# doc_id로만 조회 (쿠키가 사라졌을 때 복구용)
+def get_recent_doc_by_doc_id(doc_id: str) -> dict | None:
+    db = SessionLocal()
+    try:
+        r = (
+            db.query(RecentDoc)
+            .filter_by(doc_id=doc_id)
+            .first()
+        )
+        if not r:
+            return None
+        dt = r.mtime or datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return {
+            "user_id": r.user_id,
+            "doc_id": r.doc_id,
+            "path": r.path,
+            "mtime": dt.timestamp(),
+            "title": r.title,
+            "doc_type": r.doc_type,
+        }
+    finally:
+        db.close()
+
+# 사용자의 가장 최근 문서 1건 조회
+def get_latest_doc_for_user(user_id: str) -> dict | None:
+    db = SessionLocal()
+    try:
+        r = (
+            db.query(RecentDoc)
+            .filter_by(user_id=user_id)
+            .order_by(RecentDoc.mtime.desc())
+            .first()
+        )
+        if not r:
+            return None
+        dt = r.mtime or datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return {
+            "doc_id": r.doc_id,
+            "path": r.path,
+            "mtime": dt.timestamp(),
+            "title": r.title,
+            "doc_type": r.doc_type,
+        }
+    finally:
+        db.close()
