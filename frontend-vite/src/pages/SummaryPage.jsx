@@ -78,6 +78,9 @@ export default function SummaryPage() {
     STT: '/api/stt',
     ASK: '/api/ask',
     CONV: '/api/conversation',
+    RECENT: '/api/recent_docs',
+    IMAGE: '/api/image',
+    START: '/api/start_session',
   };
   const u = (path) => new URL(path, apiUrl).toString();
 
@@ -443,9 +446,30 @@ export default function SummaryPage() {
     try {
       const res = await axios.post(
         u(ROUTES.ASK),
-        { question: finalText },
+        { question: finalText, doc_id: docId },
         { withCredentials: true }
       );
+      // 세션 미존재 케이스 자동 복구 시도
+      if (res.data && res.data.error && String(res.data.error).includes('/start_session')) {
+        const recovered = await recoverSessionFromRecentDoc();
+        if (recovered) {
+          const res2 = await axios.post(
+            u(ROUTES.ASK),
+            { question: finalText, doc_id: docId },
+            { withCredentials: true }
+          );
+          const answer2 = res2.data?.answer || res2.data?.error || '답변을 가져오지 못했습니다.';
+          setChatList((prev) => {
+            const arr = [...prev];
+            const idx = pendingAnswerIndexRef.current;
+            if (idx != null && arr[idx]) arr[idx] = { type: 'answer', text: answer2 };
+            else arr.push({ type: 'answer', text: answer2 });
+            return arr;
+          });
+          return;
+        }
+      }
+
       const answer = res.data?.answer || res.data?.error || '답변을 가져오지 못했습니다.';
       setChatList((prev) => {
         const arr = [...prev];
@@ -465,6 +489,28 @@ export default function SummaryPage() {
       });
     }
   };
+
+  // 최근 문서 목록에서 해당 docId의 원본 이미지를 찾아 세션을 복원
+  async function recoverSessionFromRecentDoc() {
+    try {
+      const res = await fetch(u(ROUTES.RECENT), { credentials: 'include' });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      const found = items.find((it) => String(it.doc_id) === String(docId));
+      const path = found?.path || null;
+      if (!path) return false;
+      const imgRes = await fetch(`${u(ROUTES.IMAGE)}?path=${encodeURIComponent(path)}`, { credentials: 'include' });
+      if (!imgRes.ok) return false;
+      const blob = await imgRes.blob();
+      const fd = new FormData();
+      fd.append('image', new File([blob], 'restore.jpg', { type: blob.type || 'image/jpeg' }));
+      const start = await fetch(u(ROUTES.START), { method: 'POST', body: fd, credentials: 'include' });
+      return start.ok;
+    } catch {
+      return false;
+    }
+  }
 
   const handleSend = async (text) => {
     markInteracted();
