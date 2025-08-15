@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os, json, base64, mimetypes
+from io import BytesIO
+from PIL import Image
+import time
 
 from db_config import SessionLocal
 from models import Feedback
@@ -21,6 +24,8 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 router = APIRouter(prefix="/api", tags=["Feedback"])
 
+MAX_SIDE = 1600  # 긴 변 상한(전송/비용 안정화)
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]   # .../backend
 DATA_BASE   = BACKEND_DIR / "data"
 SFT_JSONL   = DATA_BASE / "sft_train" / "sft.jsonl"
@@ -32,39 +37,69 @@ def _save_jsonl(path: str, row: dict):
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-
-def _openai_improve(prompt: str, output: str, image_path: str | None) -> str:
-    if client is None:
-        return None
-    sys_prompt = "너는 항상 한국어로만 답하며 한자 대신 한글을 사용한다. 같은 정보를 더 간결하고 정확하게 개선하라."
-    user_text = (
-        "이미지를 참고하여 다음 초안 요약을 더 나은 요약으로 개선해줘.\n\n"
-        f"[지시]\n{prompt}\n\n[초안]\n{output}"
-    )
-    # chat.completions의 vision 입력 포맷
-    content = [{"type": "text", "text": user_text}]
-    if image_path and os.path.exists(image_path):
-        mime, _ = mimetypes.guess_type(image_path)
+def _encode_image_as_data_url(path: str) -> tuple[str | None, int]:
+    if not (path and os.path.exists(path)):
+        return None, 0
+    try:
+        mime, _ = mimetypes.guess_type(path)
         if not mime:
             mime = "image/jpeg"
-        with open(image_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("ascii")
-        data_url = f"data:{mime};base64,{b64}"
-        content.append({"type": "image_url", "image_url": {"url": data_url}})
+        img = Image.open(path).convert("RGB")
+        w, h = img.size
+        scale = min(1.0, MAX_SIDE / max(w, h))
+        if scale < 1.0:
+            img = img.resize((int(w * scale), int(h * scale)))
+        buf = BytesIO()
+        ext = "JPEG" if mime.endswith(("jpeg", "jpg")) else "PNG"
+        img.save(buf, format=ext, optimize=True, quality=92 if ext == "JPEG" else None)
+        b = buf.getvalue()
+        b64 = base64.b64encode(b).decode("ascii")
+        return f"data:{mime};base64,{b64}", len(b)
+    except Exception as e:
+        print(f"[feedback_router] _encode_image_as_data_url error: {e}", flush=True)
+        return None, 0
 
+
+
+def _openai_improve(prompt: str, image_path: str | None) -> str | None:
+    if client is None:
+        print("[feedback_router] OpenAI client is None (no API key)", flush=True)
+        return None
+
+    data_url, bytes_len = _encode_image_as_data_url(image_path) if image_path else (None, 0)
+    print(f"[feedback_router] image_path={image_path} exists={bool(image_path and os.path.exists(image_path))} size_bytes={bytes_len}", flush=True)
+
+    sys_prompt = (
+        "너는 한국어 요약 전문가다. 한자 금지. 사람 신원/나이/성별/민감특성 추정 금지. "
+        "배경·물체·표지 텍스트 등 비식별 정보 중심으로 간결·정확하게 2~3문장 요약."
+    )
+    user_text = f"이미지를 참고해 다음 지시에 맞게 2~3문장 요약을 생성해줘.\n[지시]\n{prompt}"
+
+    content = [{"type": "text", "text": user_text}]
+    if data_url:
+        content.append({"type": "image_url", "image_url": {"url": data_url, "detail": "high"}})
+        print("[feedback_router] sending vision: YES", flush=True)
+    else:
+        print("[feedback_router] sending vision: NO", flush=True)
+
+    t0 = time.time()
     try:
         r = client.chat.completions.create(
-            model="gpt-4o-mini",   # 비용 절감 + 비전 지원
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": content},
             ],
-            temperature=0.3,
+            temperature=0.2,
+            max_tokens=200,
         )
+        dt = time.time() - t0
         text = (r.choices[0].message.content or "").strip()
+        print(f"[feedback_router] latency_sec={dt:.2f}", flush=True)
+        print(f"[feedback_router] improved text: {text[:200]}", flush=True)
         return text or None
     except Exception as e:
-        # TODO: 재시도/백오프 넣어도 좋음
+        print(f"[feedback_router] OpenAI error: {e}", flush=True)
         return None
 
 
@@ -81,27 +116,33 @@ class FeedbackIn(BaseModel):
 
 def _background_improve_and_log(row_id: int, prompt: str, output: str, img_path: str | None, meta: dict):
     try:
-        improved = _openai_improve(prompt, output, img_path)
-        # DB 업데이트 + DPO JSONL 적재
+        improved = _openai_improve(prompt, img_path)
+
         db: Session = SessionLocal()
         try:
             fb = db.query(Feedback).filter(Feedback.id == row_id).first()
             if fb:
                 fb.improved = improved
                 db.commit()
-            if improved:
-                _save_jsonl(str(DPO_JSONL), {
-                    "image_path": img_path,
-                    "prompt": prompt,
-                    "chosen": improved,
-                    "rejected": output,
-                    "ts": datetime.utcnow().isoformat(),
-                    **meta,
-                })
         finally:
             db.close()
-    except Exception:
-        pass
+
+        if improved:
+            _save_jsonl(str(DPO_JSONL), {
+                "image_path": img_path,
+                "prompt": prompt,
+                "chosen": improved,
+                "rejected": output,
+                "ts": datetime.utcnow().isoformat(),
+                **meta,
+            })
+            print(f"[feedback_router] DPO appended: {DPO_JSONL}", flush=True)
+        else:
+            print("[feedback_router] improved is None -> skip DPO append", flush=True)
+
+    except Exception as e:
+        # ❗ 디버깅 중에는 절대 삼키지 말고 찍자
+        print(f"[feedback_router] background task error: {e}", flush=True)
 
 
 @router.post("/feedback")
