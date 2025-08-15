@@ -57,3 +57,16 @@
 }.animate-bar-1 { animation: bar-1 1.1s ease-in-out infinite; }
 .animate-bar-2 { animation: bar-2 1.3s ease-in-out infinite; }
 .animate-bar-3 { animation: bar-3 1.0s ease-in-out infinite; }
+
+/* Image modal animations */
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 150ms ease-out; }
+
+@keyframes scale-in {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-scale-in { animation: scale-in 150ms ease-out; }
