@@ -194,8 +194,6 @@ class ConversationSession:
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False
         )[0]
-        
-        print(f"[DEBUG] inference 소요 시간: {round(inference_end - inference_start, 2)}초")
         # 응답 저장
         self.messages.append({"role": "assistant", "content": output})
         self.memory.chat_memory.add_ai_message(output)

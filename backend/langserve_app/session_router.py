@@ -34,8 +34,10 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
     latest_doc_id_by_user[user_id] = doc_id
     # 문서 유형 분류 및 유형별 프롬프트 선택
     try:
+        start_classify = time.time()
         doc_type = sessions[user_id].classify()
-        doc_type = "기타"
+        end_classify = time.time()
+        print(f"[DEBUG] ⏳ 문서분류 소요 시간: {round(end_classify - start_classify, 2)}초")
         prompt_text = sessions[user_id].prompt_for(doc_type)
         # 분류 로그 (pm2 stdout 수집)
         print(f"📝 문서유형: {doc_type}")
@@ -43,8 +45,12 @@ async def start_session(image: UploadFile, response: Response, user_id: str = Co
         print(f"[WARN] 문서 유형 분류 실패: user_id={user_id} doc_id={doc_id} error={e}")
         doc_type = "기타"
         prompt_text = sessions[user_id].prompt_for(doc_type)
-    # 유형별 프롬프트로 초기 요약 생성
-    initial_summary = sessions[user_id].invoke(prompt_text)
+    
+    start_invoke = time.time()
+    initial_summary = sessions[user_id].invoke(prompt_text) # 유형별 프롬프트로 초기 요약 생성
+    end_invoke = time.time()
+    print(f"[DEBUG] ⏳ 요약 소요 시간: {round(end_invoke - start_invoke, 2)}초")
+
     append_message(user_id, doc_id, "assistant", initial_summary)
     # 최근 문서 기록 저장 (RAG 비활성화 대체)
     try:
