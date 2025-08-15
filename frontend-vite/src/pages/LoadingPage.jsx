@@ -1,8 +1,9 @@
 
 // src/pages/LoadingPage.jsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { IMAGE_UPLOAD_CONFIG, API_BASE } from '../config/appConfig';
+import { LOADING_MESSAGES, ROTATE_MS, FADE_DURATION_MS } from '../constants/loadingMessages';
 
 export default function LoadingPage() {
   const navigate = useNavigate();
@@ -11,6 +12,45 @@ export default function LoadingPage() {
 
   // 중복 실행 방지
   const ranRef = useRef(false);
+
+  // 로딩 메시지 회전 상태
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [fade, setFade] = useState(false);
+  const intervalRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  // 모션 감소 환경 감지
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 로딩 메시지 회전 효과
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      // 모션 감소 환경에서는 3초 간격으로만 변경 (슬라이드 없이)
+      intervalRef.current = setInterval(() => {
+        setMsgIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+      }, 3000);
+    } else {
+      // 일반 환경에서는 페이드+슬라이드 효과와 함께 회전
+      intervalRef.current = setInterval(() => {
+        setFade(true);
+        timeoutRef.current = setTimeout(() => {
+          setMsgIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+          setFade(false);
+        }, FADE_DURATION_MS);
+      }, ROTATE_MS);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [prefersReducedMotion]);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -107,10 +147,28 @@ export default function LoadingPage() {
   }, [imageBlob, navigate, state]);
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-white">
-      <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-800 rounded-full animate-spin mb-5"></div>
-      <div className="text-lg font-bold mb-2 text-black">잠시만 기다려주세요</div>
-      <div className="text-base text-black">문서 분석중...</div>
+    <div className="min-h-[100svh] flex flex-col items-center justify-center gap-3 md:gap-4 px-6 pb-[calc(env(safe-area-inset-bottom)+32px)] bg-white">
+      <div className="size-14 md:size-16 border-4 md:border-[6px] border-neutral-300 border-t-neutral-700 rounded-full animate-spin"></div>
+      <div className="text-neutral-900 font-bold text-xl md:text-2xl leading-tight tracking-tight">잠시만 기다려주세요</div>
+      <div 
+        className={`inline-flex items-center gap-2 rounded-full bg-neutral-100/90 px-3 py-1 shadow-sm min-h-[2rem] md:min-h-[2.25rem] ${
+          prefersReducedMotion 
+            ? `transition-opacity duration-200 ${fade ? 'opacity-0' : 'opacity-100'}`
+            : `transition-[opacity,transform] duration-250 ease-out ${fade ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`
+        }`}
+        role="status" 
+        aria-live="polite" 
+        aria-busy="true"
+      >
+        <span className="text-neutral-800 text-lg md:text-xl font-semibold leading-snug">
+          {LOADING_MESSAGES[msgIndex]}
+        </span>
+        <div className="flex items-center gap-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-neutral-500 animate-bounce"></div>
+          <div className="w-1.5 h-1.5 rounded-full bg-neutral-500 animate-bounce" style={{ animationDelay: '120ms' }}></div>
+          <div className="w-1.5 h-1.5 rounded-full bg-neutral-500 animate-bounce" style={{ animationDelay: '240ms' }}></div>
+        </div>
+      </div>
     </div>
   );
 }
