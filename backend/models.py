@@ -23,3 +23,17 @@ class RecentDoc(Base):
     mtime = Column(DateTime, default=datetime.utcnow)
     title = Column(String)
     doc_type = Column(String)
+
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)
+    doc_id = Column(String, index=True)
+    image_path = Column(Text)
+    prompt = Column(Text)
+    output = Column(Text)
+    feedback = Column(String)
+    improved = Column(Text)
+    note = Column(Text)
+    ts = Column(DateTime, default=datetime.utcnow)
