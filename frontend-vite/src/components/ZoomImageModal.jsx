@@ -1,41 +1,60 @@
-import React from 'react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import React, { useEffect } from 'react';
+import { X } from 'lucide-react';
+import UIButton from './common/UIButton';
 
 export default function ZoomImageModal({ open, src, onClose }) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center"
+    <div 
+      className="fixed inset-0 z-[2000] bg-black/80 flex items-center justify-center p-4 animate-fade-in"
       onClick={onClose}
+      style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 16px)` }}
     >
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onClose(); }}
-        className="absolute top-4 right-4 text-white/90 hover:text-white text-[18px] px-3 py-1 rounded bg-white/10"
+      <div 
+        className="w-screen h-screen flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={src}
+          alt="최근 문서 미리보기"
+          className="max-w-[100vw] max-h-[100vh] w-auto h-auto object-contain rounded-lg shadow-2xl animate-scale-in"
+          draggable={false}
+        />
+      </div>
+      
+      <UIButton
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
         aria-label="닫기"
       >
-        닫기
-      </button>
-      <div className="w-[min(100%,_640px)] h-[min(90dvh,_900px)] max-w-full max-h-[90dvh]" onClick={(e) => e.stopPropagation()}>
-        <TransformWrapper
-          initialScale={1}
-          minScale={0.6}
-          maxScale={6}
-          doubleClick={{ mode: 'zoomIn' }}
-          wheel={{ step: 0.2 }}
-          pinch={{ disabled: false }}
-          panning={{ velocityDisabled: true }}
-        >
-          <TransformComponent wrapperClass="w-full h-full" contentClass="w-full h-full">
-            <img
-              src={src}
-              className="w-full h-full object-contain select-none"
-              draggable={false}
-              alt=""
-            />
-          </TransformComponent>
-        </TransformWrapper>
-      </div>
+        <X size={24} />
+      </UIButton>
     </div>
   );
 }
