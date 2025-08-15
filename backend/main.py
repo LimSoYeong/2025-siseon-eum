@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from langserve import add_routes
 from routes.stt_router import router as stt_router
 from routes.tts_router import router as tts_router
+from routes.feedback_router import router as feedback_router
 from langserve_app.session_router import router as session_router
 
 app = FastAPI()
@@ -44,6 +45,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(stt_router)
 app.include_router(tts_router)
 app.include_router(session_router)
+app.include_router(feedback_router)
 
 @app.get("/")
 def read_root():
