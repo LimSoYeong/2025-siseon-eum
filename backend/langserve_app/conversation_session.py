@@ -9,7 +9,6 @@ from langchain.schema import HumanMessage, AIMessage
 import time
 
 from functools import lru_cache
-from faiss_db.db import SimpleFaissDB
 import numpy as np
 
 @lru_cache

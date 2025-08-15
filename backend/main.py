@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from langserve import add_routes
 from routes.stt_router import router as stt_router
-from routes.vlm_router import router as vlm_router
 from routes.tts_router import router as tts_router
 from langserve_app.session_router import router as session_router
 
@@ -43,7 +42,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 🔹 일반 FastAPI 라우터 등록
 app.include_router(stt_router)
-app.include_router(vlm_router)
 app.include_router(tts_router)
 app.include_router(session_router)
 
