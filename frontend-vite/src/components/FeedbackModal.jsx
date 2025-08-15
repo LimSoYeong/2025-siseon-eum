@@ -26,8 +26,10 @@ export default function FeedbackModal({
         credentials: 'include',
         body: JSON.stringify({
           doc_id: docId,
-          feedback: feedback,
-          summary: summaryText
+          feedback: feedback, // 'positive' | 'negative' (백엔드에서 good/bad로 정규화됨)
+          prompt: '요약 요청',
+          output: summaryText || '',
+          regenerate_with_openai: feedback === 'negative'
         })
       });
 
