@@ -2,10 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UIButton from '../components/common/UIButton';
 import { API_BASE } from '../config/appConfig';
+import ZoomImageModal from '../components/ZoomImageModal';
 
 export default function HomeScreen() {
   const navigate = useNavigate();
   const [docs, setDocs] = useState([]);
+  const [zoomModal, setZoomModal] = useState({ open: false, src: '' });
 
   useEffect(() => {
     const fetchDocs = async () => {
@@ -57,6 +59,22 @@ export default function HomeScreen() {
     }
   };
 
+  const openZoomModal = (e, src) => {
+    e.stopPropagation();
+    setZoomModal({ open: true, src });
+  };
+
+  const closeZoomModal = () => setZoomModal({ open: false, src: '' });
+
+  useEffect(() => {
+    if (!zoomModal.open) return;
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') closeZoomModal();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomModal.open]);
+
   return (
     <div className="w-full max-w-[480px] min-h-[100dvh] mx-auto flex flex-col items-center justify-start p-5 relative">
       <div className="font-semibold text-[20px] mb-[14px] self-start pl-5">최근 찍은 문서 보기</div>
@@ -68,11 +86,16 @@ export default function HomeScreen() {
             className="relative flex items-center gap-6 p-5 bg-white border border-gray-200 rounded-[15px] shadow-[0_6px_18px_rgba(0,0,0,0.12)] cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1"
             onClick={() => navigate('/summary', { state: { summary: '', docId: doc.docId, fromHome: true } })}
           >
-            <div className="w-[70px] h-[70px] rounded-[5px] bg-gray-700 overflow-hidden flex-shrink-0">
+            <button
+              type="button"
+              className="w-[70px] h-[70px] rounded-[5px] bg-gray-700 overflow-hidden flex-shrink-0 focus-visible:outline-none"
+              onClick={(e) => openZoomModal(e, doc.thumb)}
+              aria-label="썸네일 확대"
+            >
               {doc.thumb && (
-                <img src={doc.thumb} alt="thumb" className="w-full h-full object-cover" />
+                <img src={doc.thumb} alt="thumb" className="w-full h-full object-cover pointer-events-none" />
               )}
-            </div>
+            </button>
             <div className="flex-1 min-w-0">
               <div className="text-[16px] text-gray-400 mb-2">{doc.date}</div>
               <div className="text-[25px] font-black leading-[0.95] text-black truncate">문서</div>
@@ -98,6 +121,8 @@ export default function HomeScreen() {
           문서 촬영
         </UIButton>
       </div>
+
+      <ZoomImageModal open={zoomModal.open} src={zoomModal.src} onClose={closeZoomModal} />
 
       {toast && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm px-4 py-2 rounded-md shadow z-50">
