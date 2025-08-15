@@ -6,6 +6,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Mic } from 'lucide-react';
 import UIButton from '../components/common/UIButton';
+import RecordingEqualizer from '../components/RecordingEqualizer';
+import FeedbackModal from '../components/FeedbackModal';
 import { API_BASE } from '../config/appConfig';
 
 export default function SummaryPage() {
@@ -29,6 +31,7 @@ export default function SummaryPage() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioChunks, setAudioChunks] = useState([]);
   const [pulse, setPulse] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const pendingAnswerIndexRef = useRef(null);
   const pendingQuestionIndexRef = useRef(null);
 
@@ -553,6 +556,20 @@ export default function SummaryPage() {
     load();
   }, [apiUrl, docId]);
 
+  // 피드백 모달 자동 표시
+  useEffect(() => {
+    if (summaryText && docId) {
+      const feedbackGiven = localStorage.getItem(`feedback_given:${docId}`);
+      if (!feedbackGiven) {
+        // 약간의 지연 후 모달 표시 (사용자가 페이지를 볼 수 있도록)
+        const timer = setTimeout(() => {
+          setShowFeedbackModal(true);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [summaryText, docId]);
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-white">
       <div className="flex flex-col h-[100dvh] w-full overflow-hidden">
@@ -658,6 +675,11 @@ export default function SummaryPage() {
           </div>
         ) : (
           <div className="w-full px-3 py-3 sticky bottom-0 bg-white">
+            {/* 녹음 중 시각적 피드백 */}
+            <div className="flex items-center justify-center mb-3">
+              <RecordingEqualizer label="녹음 중입니다..." />
+            </div>
+            
             <UIButton className="w-full h-12 rounded-full font-bold text-[17px] text-zinc-800 bg-yellow-300 shadow"
               onClick={handleStopRecording}
             >
@@ -670,6 +692,14 @@ export default function SummaryPage() {
           </div>
         )}
       </div>
+      
+      {/* 피드백 모달 */}
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        summaryText={summaryText}
+        docId={docId}
+      />
     </div>
   );
 }
