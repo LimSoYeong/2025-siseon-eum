@@ -66,15 +66,6 @@ export default function HomeScreen() {
 
   const closeZoomModal = () => setZoomModal({ open: false, src: '' });
 
-  useEffect(() => {
-    if (!zoomModal.open) return;
-    const onKey = (ev) => {
-      if (ev.key === 'Escape') closeZoomModal();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [zoomModal.open]);
-
   return (
     <div className="w-full max-w-[480px] min-h-[100dvh] mx-auto flex flex-col items-center justify-start p-5 relative">
       <div className="font-semibold text-[20px] mb-[14px] self-start pl-5">최근 찍은 문서 보기</div>
