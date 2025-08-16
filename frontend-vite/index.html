@@ -2,9 +2,10 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>시선이음 | 문서 촬영·요약·질의응답</title>
     <meta name="description" content="카메라로 문서를 찍으면 자동으로 요약하고, 내용을 질문·답변으로 쉽게 확인하세요." />
+    <meta name="theme-color" content="#ffffff" />
 
     <!-- SEO -->
     <link rel="canonical" href="https://siseon-eum.site/" />
@@ -23,8 +24,15 @@
     <meta name="twitter:description" content="문서를 촬영하면 자동 요약과 질답을 제공합니다." />
     <!-- <meta name="twitter:image" content="/og.png" /> -->
 
+    <!-- PWA -->
     <link rel="icon" href="/favicon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="시선이음" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
   <body>
     <div id="root"></div>
