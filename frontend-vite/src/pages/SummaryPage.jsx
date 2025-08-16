@@ -645,7 +645,7 @@ export default function SummaryPage() {
         {!isRecording ? (
           <div className="w-full flex items-center gap-2 px-3 py-2 sticky bottom-0 bg-white">
             <UIButton
-              className={`w-14 h-14 rounded-full flex items-center justify-center shadow ${
+              className={`w-14 h-14 aspect-square rounded-full p-0 flex-none grid place-items-center shadow transition active:scale-95 focus-visible:outline-none focus-visible:ring-4 ${
                 pulse ? 'shadow-[0_0_0_8px_#ffd83588]' : ''
               } bg-red-600`}
               onClick={handleMicClick}
