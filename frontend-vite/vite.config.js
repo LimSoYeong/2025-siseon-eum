@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png'],
+      includeAssets: ['favicon.png', 'logo192.png', 'logo512.png', 'apple-touch-icon.png'],
       manifest: {
         name: '시선이음',
         short_name: '시선이음',
@@ -16,6 +16,10 @@ export default defineConfig({
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        id: '/',
+        orientation: 'portrait',
         icons: [
           {
             src: 'logo192.png',
@@ -26,8 +30,17 @@ export default defineConfig({
             src: 'logo512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: 'maskable_icon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
+      },
+      workbox: {
+        navigateFallback: '/index.html'
       }
     })
   ]

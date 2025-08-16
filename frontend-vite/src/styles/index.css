@@ -6,6 +6,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PWA 및 모바일 최적화 */
+@layer base {
+  html {
+    height: 100%;
+  }
+  
+  body {
+    height: 100%;
+    /* iOS Safari에서 100vh 문제 해결 */
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
+/* Safe area 대응 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Typing dots animation for pending question bubble */
 @keyframes typing-dot {
   0%, 20% { opacity: 0.35; transform: scale(0.85); }
