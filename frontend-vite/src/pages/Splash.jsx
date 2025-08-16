@@ -17,7 +17,7 @@ export default function Splash() {
 
   return (
     <div className={`w-full max-w-[400px] min-h-[80vh] mx-auto flex flex-col items-center justify-center bg-[var(--bg-color)] p-[38px_0] ${leaving ? 'animate-fade-out-up' : 'animate-fade-slide'}`}>
-      <h1 className="text-[32px] font-bold mt-[18px] mb-[30px] tracking-tight text-center">
+      <h1 className="text-[32px] font-bold mt-[18px] mb-[30px] tracking-tight text-center" style={{ fontFamily: 'NanumMyeongjo, serif' }}>
         시선이음
       </h1>
       <div className="text-[15px] text-[var(--font-color)] text-center mb-4">
