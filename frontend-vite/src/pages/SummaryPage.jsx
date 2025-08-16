@@ -643,7 +643,7 @@ export default function SummaryPage() {
 
         {/* 하단 바 */}
         {!isRecording ? (
-          <div className="w-full flex items-center gap-2 px-3 py-2 sticky bottom-0 bg-white">
+          <div className="w-full flex items-center gap-2 px-3 py-2 sticky bottom-0 bg-white safe-area-bottom">
             <UIButton
               className={`w-14 h-14 aspect-square rounded-full p-0 flex-none grid place-items-center shadow transition active:scale-95 focus-visible:outline-none focus-visible:ring-4 ${
                 pulse ? 'shadow-[0_0_0_8px_#ffd83588]' : ''
@@ -655,14 +655,14 @@ export default function SummaryPage() {
             </UIButton>
 
             <input
-              className="flex-1 h-10 rounded-[16px] px-3 text-[15px] border border-gray-300 bg-white"
+              className="flex-1 h-10 rounded-[16px] px-3 text-[15px] border border-gray-300 bg-white min-w-0"
               placeholder="질문을 입력하세요"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => isSendActive && e.key === 'Enter' && handleSend()}
             />
             <UIButton
-              className={`h-10 min-w-[48px] rounded-[13px] font-semibold text-[15px] ${
+              className={`h-10 px-3 rounded-[13px] font-semibold text-[15px] flex-shrink-0 ${
                 inputValue.trim().length
                   ? 'bg-black text-white cursor-pointer'
                   : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
