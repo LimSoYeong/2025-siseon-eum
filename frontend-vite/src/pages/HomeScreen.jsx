@@ -71,10 +71,7 @@ export default function HomeScreen() {
 
   const handleImageClick = (imageUrl) => {
     setSelectedImage(imageUrl);
-    if (!hintShownRef.current) {
-      setShowHint(true);
-      hintShownRef.current = true;
-    }
+    setShowHint(true);
     document.body.style.overflow = 'hidden';
   };
 
@@ -234,11 +231,6 @@ const FullscreenImageViewer = ({ imageUrl, onClose, showHint, setShowHint }) => 
     }
   };
 
-  // 힌트 숨김
-  const hideHint = () => {
-    setShowHint(false);
-  };
-
   // 컴포넌트 언마운트 시 스크롤 복원
   useEffect(() => {
     return () => {
@@ -265,18 +257,31 @@ const FullscreenImageViewer = ({ imageUrl, onClose, showHint, setShowHint }) => 
         ✕
       </button>
 
-      {/* 힌트 배너 */}
-      {showHint && (
-        <div 
-          className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg text-sm z-10 transition-opacity duration-300"
-          onClick={(e) => {
-            e.stopPropagation();
-            hideHint();
-          }}
-        >
-          두 손가락으로 확대 가능합니다
-        </div>
-      )}
+             {/* 힌트 배너 */}
+       {showHint && (
+         <div 
+           className="fixed bg-white text-black px-3 py-2 rounded-xl shadow-lg"
+           style={{
+             bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+             left: '50%',
+             transform: 'translateX(-50%)',
+             zIndex: 60,
+             maxWidth: 'calc(100% - 32px)',
+             whiteSpace: 'nowrap',
+             textAlign: 'center',
+             display: 'inline-flex',
+             alignItems: 'center',
+             justifyContent: 'center',
+             fontSize: 'clamp(12px, 3.5vw, 14px)',
+             pointerEvents: 'none',
+             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+           }}
+           role="status"
+           aria-live="polite"
+         >
+           두 손가락으로 확대 가능합니다.
+         </div>
+       )}
 
              {/* 이미지 */}
        <img
