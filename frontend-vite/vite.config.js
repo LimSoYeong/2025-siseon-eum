@@ -20,6 +20,7 @@ export default defineConfig({
         scope: '/',
         id: '/',
         orientation: 'portrait',
+        permissions: ['camera'],
         icons: [
           {
             src: 'logo192.png',
@@ -43,7 +44,10 @@ export default defineConfig({
         navigateFallback: '/index.html'
       }
     })
-  ]
+  ],
+  server: {
+    https: false
+  }
 })
   
 
