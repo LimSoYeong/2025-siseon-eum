@@ -26,7 +26,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://siseon-eum.site",   # 배포용
-        "https://www.siseon-eum.site",  # 쉼표 추가
+        "https://www.siseon-eum.site",
         "http://localhost:5173",     # Vite dev
         "http://localhost:5174",     # Vite dev (다른 포트)
         "http://127.0.0.1:5173",
