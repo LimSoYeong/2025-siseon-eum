@@ -8,10 +8,9 @@ from openai import OpenAI
 
 load_dotenv()
 OPENAI_API = os.getenv("OPENAI_API")
-client = OpenAI(api_key=OPENAI_API)
+client = OpenAI(api_key="OPENAI_API")
 
 MODEL_NAME = "gpt-4o"  # 비용 줄이려면 "gpt-4o-mini"로 교체
-
 def force_int_0_100(x):
     try:
         n = int(float(x))
