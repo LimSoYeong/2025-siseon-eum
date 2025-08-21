@@ -53,4 +53,6 @@ frontend-vite/.env*
 
 .faiss
 .pkl
-app.db
+app.dbbackend/outputs/
+ai/qwen/outputs/
+*.safetensors
