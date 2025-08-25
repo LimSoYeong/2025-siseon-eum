@@ -6,7 +6,7 @@ from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
 MODEL_BASE = os.getenv("MODEL_BASE", "Qwen/Qwen2.5-VL-7B-Instruct")
 ADAPTER_DIR = os.getenv("ADAPTER_DIR", "backend/outputs/dpo/policy")
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # peft는 선택적 의존성으로 처리 (없어도 베이스로 기동)
 try:
@@ -22,20 +22,21 @@ if torch.cuda.is_available():
 @lru_cache()
 def get_model():
     torch.backends.cuda.matmul.allow_tf32 = True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 1) 베이스 모델 로드
     base = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         MODEL_BASE,
         torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
-        device_map={"": "cuda:0"},
-    )
+        # device_map={"": "cuda:0"},
+    ).to(device)
 
     # 2) 어댑터 있으면 장착, 없으면 베이스로 폴백
     if HAVE_PEFT and os.path.exists(ADAPTER_DIR):
         try:
             print(f"[model_loader] attaching adapter: {ADAPTER_DIR}")
-            model = PeftModel.from_pretrained(base, ADAPTER_DIR, device_map={"": "cuda:0"})
+            model = PeftModel.from_pretrained(base, ADAPTER_DIR)
             return model.eval()
         except Exception as e:
             print(f"[WARN] adapter attach failed: {e} -> fallback to base")
